@@ -6,12 +6,12 @@ export default function NotFound({ onBackToHome }) {
   return (
     <section className="py-[120px] flex items-center justify-center">
       <Reveal>
-        <div className="bg-[#101314] border-2 border-[#22252C] shadow-[6px_6px_0px_var(--color-line)] p-8 max-w-[500px] text-left">
+        <div className="bg-paper border-2 border-line shadow-[6px_6px_0px_var(--color-line)] p-8 max-w-[500px] text-left">
           <div className="font-code text-lime flex items-center gap-2 mb-4">
             <Terminal size={18} />
             <span>sys.error(404)</span>
           </div>
-          <h2 className="font-display font-bold text-2xl text-white mb-3">
+          <h2 className="font-display font-bold text-2xl text-ink mb-3">
             File Not Found
           </h2>
           <p className="font-body text-sm leading-relaxed text-soft mb-6">

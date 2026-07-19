@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ThemeToggle from './ThemeToggle';
 
 const NAV_ITEMS = [
   { label: 'Home',       id: 'home' },
@@ -7,7 +8,14 @@ const NAV_ITEMS = [
   { label: 'Experience', id: 'experience' },
 ];
 
-export default function Navbar({ activeSection, onNavigate, mobileOpen, setMobileOpen }) {
+export default function Navbar({ 
+  activeSection, 
+  onNavigate, 
+  mobileOpen, 
+  setMobileOpen,
+  theme,
+  onToggleTheme
+}) {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -39,15 +47,17 @@ export default function Navbar({ activeSection, onNavigate, mobileOpen, setMobil
         ))}
       </ul>
 
-      {/* CTA */}
-      <button
-        id="nav-contact-cta"
-        className="nav-cta"
-        style={{ display: window.innerWidth < 768 ? 'none' : 'inline-flex' }}
-        onClick={() => onNavigate('contact')}
-      >
-        Hire Me
-      </button>
+      {/* Action toggles and CTA */}
+      <div className="nav-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+        <button
+          id="nav-contact-cta"
+          className="nav-cta"
+          onClick={() => onNavigate('contact')}
+        >
+          Hire Me
+        </button>
+      </div>
 
       {/* Hamburger */}
       <button

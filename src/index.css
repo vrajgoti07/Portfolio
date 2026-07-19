@@ -1,4 +1,13 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-soft: var(--text-secondary);
+  --color-ink: var(--text-primary);
+  --color-paper: var(--bg-card);
+  --color-line: var(--border-subtle);
+  --color-panel: var(--bg-surface);
+}
 
 /* ─── RESET & BASE ──────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -46,6 +55,32 @@
   /* Spacing */
   --section-py: 7rem;
   --max-w: 1100px;
+}
+
+/* Light Theme Variables */
+:root.light-theme {
+  --bg-deep:    #F8F9FA;
+  --bg-card:    #FFFFFF;
+  --bg-glass:   rgba(248, 249, 250, 0.7);
+  --bg-surface: #E9ECEF;
+
+  --text-primary:   #212529;
+  --text-secondary: #495057;
+  --text-muted:     #6C757D;
+
+  --border-subtle:  rgba(108, 99, 255, 0.15);
+  --border-glow:    rgba(108, 99, 255, 0.25);
+  --border-card:    rgba(33, 37, 41, 0.08);
+}
+
+/* Reduced Motion Overrides */
+.reduced-motion *,
+.reduced-motion *::before,
+.reduced-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
 }
 
 html { scroll-behavior: smooth; }
@@ -941,3 +976,37 @@ section { padding: var(--section-py) 0; }
 .delay-3 { animation-delay: 0.35s; }
 .delay-4 { animation-delay: 0.5s; }
 .delay-5 { animation-delay: 0.65s; }
+
+/* ─── TOGGLE BUTTONS ────────────────────────────────────────── */
+.toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  font-family: var(--font-code);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toggle-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border-color: var(--border-glow);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(108, 99, 255, 0.15);
+}
+
+.toggle-btn svg {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.toggle-btn:hover svg {
+  transform: scale(1.1);
+}
