@@ -4,10 +4,8 @@ const app = express();
 
 const PORT = 5000;
 
-// Middleware
 app.use(express.json());
 
-// In-memory data
 let tasks = [
   {
     id: 1,
