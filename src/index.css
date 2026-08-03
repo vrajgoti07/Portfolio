@@ -1510,3 +1510,11 @@ section { padding: var(--section-py) 0; }
     font-size: 0.78rem;
   }
 }
+
+/* ─── Contact Info Card Hover ───────────────────────────────── */
+.contact-info-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-glow) !important;
+  box-shadow: 0 12px 30px rgba(108, 99, 255, 0.15);
+}
+

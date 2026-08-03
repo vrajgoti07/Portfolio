@@ -1,16 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
-import Hero from './components/Hero';
-import Projects from './components/Projects';
-import Skills from './components/Skills';
-import Experience from './components/Experience';
-import Contact from './components/Contact';
 import Footer from './components/Footer';
+import Home from './pages/Home';
+import ProjectsPage from './pages/ProjectsPage';
+import ContactPage from './pages/ContactPage';
 import NotFound from './pages/NotFound';
 
 export default function App() {
   const [scrollProgress, setScrollProgress] = useState(0);
-  const [activeSection, setActiveSection] = useState('home');
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // Theme state: defaults to dark mode, saved in local storage
@@ -28,7 +25,6 @@ export default function App() {
     }
     localStorage.setItem('theme', theme);
   }, [theme]);
-
 
   // Listen to popstate for browser back/forward routing
   useEffect(() => {
@@ -51,71 +47,48 @@ export default function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Active section tracking for single-page scrolling
-  useEffect(() => {
-    if (currentPath !== '/' && currentPath !== '/index.html') return;
-
-    const sections = ['home', 'projects', 'skills', 'experience', 'contact'];
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setActiveSection(entry.target.id);
-          }
-        });
-      },
-      { rootMargin: '-40% 0px -55% 0px' }
-    );
-
-    sections.forEach((id) => {
-      const el = document.getElementById(id);
-      if (el) observer.observe(el);
-    });
-
-    return () => observer.disconnect();
-  }, [currentPath]);
-
-  // Scroll to section helper
-  const scrollTo = (id) => {
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  // Central navigation handler
+  const handleNavigate = (path) => {
+    if (window.location.pathname !== path) {
+      window.history.pushState({}, '', path);
+      setCurrentPath(path);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     setMobileOpen(false);
   };
 
-  // Central navigation handler
-  const handleNavigate = (id) => {
-    if (currentPath !== '/' && currentPath !== '/index.html') {
-      // If we are on a Not Found path, go to Home first, then scroll
-      window.history.pushState({}, '', '/');
-      setCurrentPath('/');
-      setTimeout(() => {
-        scrollTo(id);
-      }, 100);
-    } else {
-      scrollTo(id);
+  const navItems = [
+    { label: 'Home', path: '/' },
+    { label: 'Projects', path: '/projects' },
+    { label: 'Contact', path: '/contact' },
+  ];
+
+  const renderContent = () => {
+    switch (currentPath) {
+      case '/':
+      case '/index.html':
+      case '/home':
+        return <Home onNavigate={handleNavigate} />;
+      case '/projects':
+        return <ProjectsPage />;
+      case '/contact':
+        return <ContactPage />;
+      default:
+        return <NotFound onBackToHome={() => handleNavigate('/')} />;
     }
   };
-
-  const handleBackToHome = () => {
-    window.history.pushState({}, '', '/');
-    setCurrentPath('/');
-  };
-
-  const isNotFound = currentPath !== '/' && currentPath !== '/index.html';
 
   return (
     <>
       {/* Scroll progress bar */}
-      {!isNotFound && (
-        <div
-          className="scroll-progress"
-          style={{ width: `${scrollProgress}%` }}
-        />
-      )}
+      <div
+        className="scroll-progress"
+        style={{ width: `${scrollProgress}%` }}
+      />
 
       {/* Navbar */}
       <Navbar
-        activeSection={isNotFound ? '' : activeSection}
+        currentPath={currentPath}
         onNavigate={handleNavigate}
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
@@ -125,30 +98,20 @@ export default function App() {
 
       {/* Mobile menu */}
       <div className={`mobile-menu ${mobileOpen ? 'open' : ''}`}>
-        {['home', 'projects', 'skills', 'experience', 'contact'].map((id) => (
+        {navItems.map((item) => (
           <button
-            key={id}
+            key={item.path}
             className="mobile-nav-link"
-            onClick={() => handleNavigate(id)}
+            onClick={() => handleNavigate(item.path)}
           >
-            {id.charAt(0).toUpperCase() + id.slice(1)}
+            {item.label}
           </button>
         ))}
       </div>
 
       {/* Pages */}
       <main>
-        {isNotFound ? (
-          <NotFound onBackToHome={handleBackToHome} />
-        ) : (
-          <>
-            <Hero onNavigate={handleNavigate} />
-            <Projects />
-            <Skills />
-            <Experience />
-            <Contact />
-          </>
-        )}
+        {renderContent()}
       </main>
 
       <Footer />

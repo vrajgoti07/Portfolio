@@ -106,14 +106,14 @@ export default function Hero({ onNavigate }) {
             <button
               id="hero-view-work"
               className="btn btn-primary"
-              onClick={() => onNavigate('projects')}
+              onClick={() => onNavigate('/projects')}
             >
               View My Work <ArrowRight />
             </button>
             <button
               id="hero-contact"
               className="btn btn-ghost"
-              onClick={() => onNavigate('contact')}
+              onClick={() => onNavigate('/contact')}
             >
               Get In Touch
             </button>

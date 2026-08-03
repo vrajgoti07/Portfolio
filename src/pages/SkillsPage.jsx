@@ -1,11 +1,10 @@
 import React from 'react';
-import Projects from '../components/Projects';
+import Skills from '../components/Skills';
 
-export default function ProjectsPage() {
+export default function SkillsPage() {
   return (
     <div style={{ paddingTop: '80px', paddingBottom: '4rem' }}>
-      <Projects />
+      <Skills />
     </div>
   );
 }
-
