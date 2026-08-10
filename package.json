@@ -1,0 +1,16 @@
+{
+  "name": "awdf-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Task Manager Monorepo - Express REST API & React Frontend",
+  "scripts": {
+    "backend": "npm --prefix Backend run dev",
+    "backend:start": "npm --prefix Backend run start:new",
+    "frontend": "npm --prefix Frontend run dev",
+    "frontend:build": "npm --prefix Frontend run build",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

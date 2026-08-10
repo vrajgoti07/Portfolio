@@ -1,15 +1,24 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "server.js",
+  "description": "Task Manager Express REST API with MongoDB Integration",
+  "main": "server_new.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "start:new": "node server_new.js",
+    "dev": "nodemon server_new.js"
   },
-  "keywords": [],
+  "keywords": ["express", "mongodb", "mongoose", "rest-api", "tasks"],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.19.2"
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mongoose": "^8.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
   }
 }
+
