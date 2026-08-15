@@ -1,5 +1,3 @@
-import React from 'react';
-
 /* ─── Inline SVG Icons ──────────────────────────────────────── */
 
 /** Star icon */

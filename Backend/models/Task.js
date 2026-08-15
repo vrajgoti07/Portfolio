@@ -7,6 +7,16 @@ const taskSchema = new mongoose.Schema(
       required: [true, "Title is required"],
       trim: true
     },
+    description: {
+      type: String,
+      default: "",
+      trim: true
+    },
+    status: {
+      type: String,
+      enum: ["Pending", "In Progress", "Completed"],
+      default: "Pending"
+    },
     completed: {
       type: Boolean,
       default: false
@@ -18,3 +28,4 @@ const taskSchema = new mongoose.Schema(
 );
 
 module.exports = mongoose.model("Task", taskSchema);
+

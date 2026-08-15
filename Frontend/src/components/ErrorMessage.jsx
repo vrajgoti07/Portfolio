@@ -1,5 +1,3 @@
-import React from 'react';
-
 /**
  * ErrorMessage — Displayed when the GitHub API call fails.
  * Shows a friendly message and a Retry button to re-trigger the fetch.
@@ -7,7 +5,7 @@ import React from 'react';
  * Props:
  *   onRetry {Function} — callback passed from Projects.jsx to re-fetch repos
  */
-export default function ErrorMessage({ onRetry }) {
+export default function ErrorMessage({ message, onRetry }) {
   return (
     <div className="error-wrapper" role="alert" aria-live="assertive">
       {/* Icon */}
@@ -31,10 +29,12 @@ export default function ErrorMessage({ onRetry }) {
       </div>
 
       {/* Headline */}
-      <h3 className="error-title">Something went wrong</h3>
+      <h3 className="error-title">Backend Server Disconnected</h3>
 
       {/* Message */}
-      <p className="error-message">Unable to fetch GitHub repositories.</p>
+      <p className="error-message">
+        {message || "Unable to connect to backend server. Please make sure the backend is running at http://localhost:5000."}
+      </p>
 
       {/* Retry button */}
       <button

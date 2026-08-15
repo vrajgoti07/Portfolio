@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { stats } from '../data/portfolioData';
 
 // Simple arrow-right SVG
@@ -18,21 +18,16 @@ const Download = () => (
   </svg>
 );
 
+const ROLES = ['Backend Developer', 'Python Developer', 'Database Engineer'];
+
 export default function Hero({ onNavigate }) {
-  const [typed, setTyped] = useState('');
-  const [mounted, setMounted] = useState(false);
-  const roles = ['Backend Developer', 'Python Developer', 'Database Engineer'];
   const [roleIdx, setRoleIdx] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [charIdx, setCharIdx] = useState(0);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   // Typewriter effect cycling through roles
   useEffect(() => {
-    const currentRole = roles[roleIdx];
+    const currentRole = ROLES[roleIdx];
     let timeout;
 
     if (!isDeleting && charIdx < currentRole.length) {
@@ -42,14 +37,16 @@ export default function Hero({ onNavigate }) {
     } else if (isDeleting && charIdx > 0) {
       timeout = setTimeout(() => setCharIdx((c) => c - 1), 40);
     } else if (isDeleting && charIdx === 0) {
-      setIsDeleting(false);
-      setRoleIdx((i) => (i + 1) % roles.length);
+      timeout = setTimeout(() => {
+        setIsDeleting(false);
+        setRoleIdx((i) => (i + 1) % ROLES.length);
+      }, 0);
     }
 
     return () => clearTimeout(timeout);
   }, [charIdx, isDeleting, roleIdx]);
 
-  const currentRole = roles[roleIdx];
+  const currentRole = ROLES[roleIdx];
 
   return (
     <section id="home" className="hero">
@@ -64,7 +61,7 @@ export default function Hero({ onNavigate }) {
       <div className="container" style={{ width: '100%' }}>
         <div className="hero-content">
           {/* Status badge */}
-          <div className={`hero-badge fade-in-up delay-1 ${mounted ? '' : ''}`}>
+          <div className="hero-badge fade-in-up delay-1">
             <span className="hero-badge-dot" />
             Available for new opportunities
           </div>

@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
 import ProjectsPage from './pages/ProjectsPage';
+import TaskPage from './pages/TaskPage';
 import ContactPage from './pages/ContactPage';
+import SkillsPage from './pages/SkillsPage';
 import NotFound from './pages/NotFound';
 
 export default function App() {
@@ -14,7 +16,7 @@ export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
 
   // Routing state
-  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const [currentPath, setCurrentPath] = useState(() => window.location.pathname.toLowerCase());
 
   // Synchronize Theme with DOM
   useEffect(() => {
@@ -29,7 +31,7 @@ export default function App() {
   // Listen to popstate for browser back/forward routing
   useEffect(() => {
     const handleLocationChange = () => {
-      setCurrentPath(window.location.pathname);
+      setCurrentPath(window.location.pathname.toLowerCase());
     };
     window.addEventListener('popstate', handleLocationChange);
     return () => window.removeEventListener('popstate', handleLocationChange);
@@ -49,9 +51,10 @@ export default function App() {
 
   // Central navigation handler
   const handleNavigate = (path) => {
-    if (window.location.pathname !== path) {
-      window.history.pushState({}, '', path);
-      setCurrentPath(path);
+    const cleanPath = path.toLowerCase();
+    if (window.location.pathname.toLowerCase() !== cleanPath) {
+      window.history.pushState({}, '', cleanPath);
+      setCurrentPath(cleanPath);
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setMobileOpen(false);
@@ -64,17 +67,24 @@ export default function App() {
   ];
 
   const renderContent = () => {
-    switch (currentPath) {
+    const path = currentPath.replace(/\/+$/, '') || '/';
+
+    switch (path) {
       case '/':
       case '/index.html':
       case '/home':
         return <Home onNavigate={handleNavigate} />;
       case '/projects':
-        return <ProjectsPage />;
+        return <ProjectsPage onNavigate={handleNavigate} />;
+      case '/task':
+      case '/tasks':
+        return <TaskPage onNavigate={handleNavigate} />;
       case '/contact':
-        return <ContactPage />;
+        return <ContactPage onNavigate={handleNavigate} />;
+      case '/skills':
+        return <SkillsPage onNavigate={handleNavigate} />;
       default:
-        return <NotFound onBackToHome={() => handleNavigate('/')} />;
+        return <NotFound onBackToHome={() => handleNavigate('/')} onNavigate={handleNavigate} />;
     }
   };
 
@@ -94,6 +104,7 @@ export default function App() {
         setMobileOpen={setMobileOpen}
         theme={theme}
         onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+        navItems={navItems}
       />
 
       {/* Mobile menu */}
@@ -104,7 +115,10 @@ export default function App() {
             className="mobile-nav-link"
             onClick={() => handleNavigate(item.path)}
           >
-            {item.label}
+            <span>{item.label}</span>
+            {item.badge && (
+              <span className="nav-item-badge">{item.badge}</span>
+            )}
           </button>
         ))}
       </div>

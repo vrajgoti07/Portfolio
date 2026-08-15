@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Reveal from './Reveal';
 
 // SVG Icons

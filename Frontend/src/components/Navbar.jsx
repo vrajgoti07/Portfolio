@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import ThemeToggle from './ThemeToggle';
 
-const NAV_ITEMS = [
-  { label: 'Home',     path: '/' },
+const DEFAULT_NAV_ITEMS = [
+  { label: 'Home', path: '/' },
   { label: 'Projects', path: '/projects' },
-  { label: 'Contact',  path: '/contact' },
+  { label: 'Contact', path: '/contact' },
 ];
 
 export default function Navbar({ 
@@ -13,7 +13,8 @@ export default function Navbar({
   mobileOpen, 
   setMobileOpen,
   theme,
-  onToggleTheme
+  onToggleTheme,
+  navItems = DEFAULT_NAV_ITEMS
 }) {
   const [scrolled, setScrolled] = useState(false);
 
@@ -22,6 +23,16 @@ export default function Navbar({
     window.addEventListener('scroll', handle, { passive: true });
     return () => window.removeEventListener('scroll', handle);
   }, []);
+
+  const isItemActive = (item) => {
+    if (item.path === '/') {
+      return currentPath === '/' || currentPath === '/home' || currentPath === '/index.html' || currentPath === '';
+    }
+    if (item.path === '/task') {
+      return currentPath === '/task' || currentPath === '/tasks';
+    }
+    return currentPath === item.path;
+  };
 
   return (
     <nav className={`nav ${scrolled ? 'scrolled' : ''}`}>
@@ -33,16 +44,19 @@ export default function Navbar({
 
       {/* Desktop links */}
       <ul className="nav-links">
-        {NAV_ITEMS.map((item) => {
-          const isActive = currentPath === item.path || (item.path === '/' && (currentPath === '/home' || currentPath === '/index.html'));
+        {navItems.map((item) => {
+          const active = isItemActive(item);
           return (
             <li key={item.path}>
               <button
                 id={`nav-${item.label.toLowerCase()}`}
-                className={`nav-link ${isActive ? 'active' : ''}`}
+                className={`nav-link ${active ? 'active' : ''}`}
                 onClick={() => onNavigate(item.path)}
               >
-                {item.label}
+                <span>{item.label}</span>
+                {item.badge && (
+                  <span className="nav-badge-pill">{item.badge}</span>
+                )}
               </button>
             </li>
           );
@@ -68,4 +82,3 @@ export default function Navbar({
     </nav>
   );
 }
-

@@ -1,5 +1,3 @@
-import React from 'react';
-
 /**
  * Spinner — Animated loading indicator shown while GitHub repos are being fetched.
  * Matches the portfolio's dark-glass design language.

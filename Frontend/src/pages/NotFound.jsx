@@ -1,4 +1,3 @@
-import React from 'react';
 import { Terminal, ArrowRight } from 'lucide-react';
 import Reveal from '../components/Reveal';
 
