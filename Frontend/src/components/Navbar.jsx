@@ -3,18 +3,22 @@ import ThemeToggle from './ThemeToggle';
 
 const DEFAULT_NAV_ITEMS = [
   { label: 'Home', path: '/' },
+  { label: 'Tasks', path: '/tasks' },
   { label: 'Projects', path: '/projects' },
   { label: 'Contact', path: '/contact' },
 ];
 
-export default function Navbar({ 
-  currentPath, 
-  onNavigate, 
-  mobileOpen, 
+export default function Navbar({
+  currentPath,
+  onNavigate,
+  mobileOpen,
   setMobileOpen,
   theme,
   onToggleTheme,
-  navItems = DEFAULT_NAV_ITEMS
+  navItems = DEFAULT_NAV_ITEMS,
+  user,
+  isAuthenticated,
+  onLogout
 }) {
   const [scrolled, setScrolled] = useState(false);
 
@@ -28,7 +32,7 @@ export default function Navbar({
     if (item.path === '/') {
       return currentPath === '/' || currentPath === '/home' || currentPath === '/index.html' || currentPath === '';
     }
-    if (item.path === '/task') {
+    if (item.path === '/task' || item.path === '/tasks') {
       return currentPath === '/task' || currentPath === '/tasks';
     }
     return currentPath === item.path;
@@ -63,8 +67,67 @@ export default function Navbar({
         })}
       </ul>
 
-      {/* Action toggles */}
+      {/* Auth Actions & Theme Toggle */}
       <div className="nav-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {isAuthenticated ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span
+              id="user-badge"
+              style={{
+                fontFamily: 'var(--font-code)',
+                fontSize: '0.75rem',
+                padding: '0.35rem 0.75rem',
+                borderRadius: '100px',
+                background: 'rgba(108, 99, 255, 0.15)',
+                border: '1px solid rgba(108, 99, 255, 0.35)',
+                color: 'var(--accent-secondary)',
+                maxWidth: '180px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+              title={user?.email || 'Authenticated User'}
+            >
+              {user?.email || 'Logged In'}
+            </span>
+            <button
+              id="logout-btn"
+              onClick={onLogout}
+              className="btn-secondary"
+              style={{
+                padding: '0.4rem 0.85rem',
+                fontSize: '0.8rem',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                background: 'rgba(239, 68, 68, 0.1)',
+                color: '#EF4444'
+              }}
+            >
+              Logout
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              id="nav-login-btn"
+              onClick={() => onNavigate('/login')}
+              className={`nav-link ${currentPath === '/login' ? 'active' : ''}`}
+              style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', cursor: 'pointer' }}
+            >
+              Login
+            </button>
+            <button
+              id="nav-register-btn"
+              onClick={() => onNavigate('/register')}
+              className="btn-primary"
+              style={{ padding: '0.4rem 0.85rem', fontSize: '0.82rem', borderRadius: '8px', cursor: 'pointer' }}
+            >
+              Register
+            </button>
+          </div>
+        )}
+
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
       </div>
 

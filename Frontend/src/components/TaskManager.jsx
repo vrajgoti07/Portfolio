@@ -86,7 +86,7 @@ const CheckCircleIcon = () => (
   </svg>
 );
 
-export default function TaskManager() {
+export default function TaskManager({ user, onLogout }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -338,10 +338,23 @@ export default function TaskManager() {
           <div className="task-header-wrap">
             <div>
               <div className="task-badge-meta">
-                <span className="section-tag" style={{ margin: 0 }}>Full-Stack Integration</span>
+                <span className="section-tag" style={{ margin: 0 }}>Practical 7 Protected CRUD</span>
                 <span className="task-conn-badge">
                   <span className={`task-conn-dot ${error ? 'offline' : 'online'}`} />
-                  {error ? 'MongoDB Disconnected' : 'MongoDB Connected'}
+                  {error ? 'MongoDB Disconnected' : 'MongoDB Atlas Connected'}
+                </span>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-code)',
+                    fontSize: '0.75rem',
+                    padding: '0.2rem 0.6rem',
+                    borderRadius: '100px',
+                    background: 'rgba(108, 99, 255, 0.15)',
+                    border: '1px solid rgba(108, 99, 255, 0.35)',
+                    color: 'var(--accent-secondary)'
+                  }}
+                >
+                  🔒 JWT Authenticated {user?.email ? `(${user.email})` : ''}
                 </span>
               </div>
               <h1 className="section-title" style={{ marginTop: '0.5rem', marginBottom: '0.5rem' }}>

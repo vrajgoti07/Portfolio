@@ -1,27 +1,40 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
 const Task = require("./models/Task");
+const User = require("./models/User");
+const authMiddleware = require("./middleware/authMiddleware");
+const validateTask = require("./middleware/validateTask");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/taskdb";
+const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/awdf_db";
 
-// Middleware
+// Global Middleware
 app.use(cors());
 app.use(express.json());
 
 // MongoDB Database Connection
-mongoose
-  .connect(MONGO_URI)
-  .then(() => {
-    console.log("Connected successfully to MongoDB database");
-  })
-  .catch((err) => {
-    console.error("MongoDB connection error:", err.message);
-  });
+const connectDB = async () => {
+  try {
+    await mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 4000 });
+    console.log("Connected successfully to MongoDB database (awdf_db)");
+  } catch (err) {
+    console.warn(`Primary MongoDB connection error: ${err.message}. Attempting local fallback...`);
+    try {
+      await mongoose.connect("mongodb://127.0.0.1:27017/awdf_db", { serverSelectionTimeoutMS: 4000 });
+      console.log("Connected successfully to local MongoDB database (awdf_db)");
+    } catch (fallbackErr) {
+      console.error("MongoDB connection error:", fallbackErr.message);
+    }
+  }
+};
+
+connectDB();
 
 // =========================
 // Root Route
@@ -29,15 +42,158 @@ mongoose
 app.get("/", (req, res) => {
   res.status(200).json({
     status: "success",
-    message: "Task Manager API (MongoDB Persistent) Running Successfully",
+    message: "Task Manager API with JWT Authentication & Middleware Pipeline Running Successfully",
     timestamp: new Date().toISOString()
   });
 });
 
-// =========================
-// GET - Get All Tasks
-// =========================
-app.get("/tasks", async (req, res) => {
+// ==========================================
+// Authentication Routes (Practical 7)
+// ==========================================
+
+// POST /register - Register a new user
+app.post("/register", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({
+        message: "Email is required"
+      });
+    }
+
+    if (!password || typeof password !== "string" || password.trim() === "") {
+      return res.status(400).json({
+        message: "Password is required"
+      });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      return res.status(400).json({
+        message: "Please provide a valid email address"
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        message: "Password must be at least 6 characters long"
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email: normalizedEmail });
+    if (existingUser) {
+      return res.status(400).json({
+        message: "Email is already registered"
+      });
+    }
+
+    // Hash password with bcrypt (10 rounds)
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = new User({
+      email: normalizedEmail,
+      password: hashedPassword
+    });
+
+    await newUser.save();
+
+    return res.status(201).json({
+      message: "User registered successfully"
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({
+        message: "Email is already registered"
+      });
+    }
+    return res.status(500).json({
+      message: "Server error during registration",
+      error: error.message
+    });
+  }
+});
+
+// POST /login - User Login & JWT Generation
+app.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        message: "Email and password are required"
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Find user by email
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user) {
+      return res.status(401).json({
+        message: "Invalid email or password"
+      });
+    }
+
+    // Compare password with bcrypt hash
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({
+        message: "Invalid email or password"
+      });
+    }
+
+    // Generate JWT token with ~1 hour expiry
+    const token = jwt.sign(
+      { id: user._id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    return res.status(200).json({
+      message: "Login successful",
+      token
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Server error during login",
+      error: error.message
+    });
+  }
+});
+
+// GET /me - Get Current Authenticated User (Protected)
+app.get("/me", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("-password");
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found"
+      });
+    }
+
+    return res.status(200).json({
+      _id: user._id,
+      email: user.email,
+      createdAt: user.createdAt
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to retrieve user profile",
+      error: error.message
+    });
+  }
+});
+
+// ==========================================
+// Protected Task Routes (Practical 6 + Practical 7)
+// ==========================================
+
+// GET /tasks - Get All Tasks (Protected by authMiddleware)
+app.get("/tasks", authMiddleware, async (req, res) => {
   try {
     const tasks = await Task.find().sort({ createdAt: -1 });
     res.status(200).json(tasks);
@@ -49,10 +205,8 @@ app.get("/tasks", async (req, res) => {
   }
 });
 
-// =========================
-// GET - Get Task By ID
-// =========================
-app.get("/tasks/:id", async (req, res) => {
+// GET /tasks/:id - Get Single Task (Protected by authMiddleware)
+app.get("/tasks/:id", authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     let task = null;
@@ -76,22 +230,17 @@ app.get("/tasks/:id", async (req, res) => {
   }
 });
 
-// =========================
-// POST - Create Task
-// =========================
-app.post("/tasks", async (req, res) => {
+// POST /tasks - Create Task (Protected by authMiddleware and validateTask)
+app.post("/tasks", authMiddleware, validateTask, async (req, res) => {
   try {
     const { title, description, status, completed } = req.body;
 
-    if (!title || title.trim() === "") {
-      return res.status(400).json({
-        message: "Title is required"
-      });
-    }
-
-    const taskStatus = status && ["Pending", "In Progress", "Completed"].includes(status)
-      ? status
-      : (completed ? "Completed" : "Pending");
+    const taskStatus =
+      status && ["Pending", "In Progress", "Completed"].includes(status)
+        ? status
+        : completed
+        ? "Completed"
+        : "Pending";
 
     const newTask = new Task({
       title: title.trim(),
@@ -114,10 +263,8 @@ app.post("/tasks", async (req, res) => {
   }
 });
 
-// =========================
-// PUT - Update Task
-// =========================
-app.put("/tasks/:id", async (req, res) => {
+// PUT /tasks/:id - Update Task (Protected by authMiddleware and validateTask)
+app.put("/tasks/:id", authMiddleware, validateTask, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -131,11 +278,6 @@ app.put("/tasks/:id", async (req, res) => {
     if (req.body.title !== undefined) updateData.title = req.body.title.trim();
     if (req.body.description !== undefined) updateData.description = req.body.description.trim();
     if (req.body.status !== undefined) {
-      if (!["Pending", "In Progress", "Completed"].includes(req.body.status)) {
-        return res.status(400).json({
-          message: "Invalid status. Must be Pending, In Progress, or Completed"
-        });
-      }
       updateData.status = req.body.status;
       updateData.completed = req.body.status === "Completed";
     } else if (req.body.completed !== undefined) {
@@ -166,10 +308,8 @@ app.put("/tasks/:id", async (req, res) => {
   }
 });
 
-// =========================
-// DELETE - Delete Task
-// =========================
-app.delete("/tasks/:id", async (req, res) => {
+// DELETE /tasks/:id - Delete Task (Protected by authMiddleware)
+app.delete("/tasks/:id", authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -197,6 +337,13 @@ app.delete("/tasks/:id", async (req, res) => {
       error: error.message
     });
   }
+});
+
+// Global 404 Handler
+app.use((req, res) => {
+  res.status(404).json({
+    message: "Endpoint not found"
+  });
 });
 
 // Server listener
