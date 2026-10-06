@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Reveal from './Reveal';
 import Spinner from './Spinner';
 import ErrorMessage from './ErrorMessage';
 import NotificationToast from './NotificationToast';
 import { getTasks, updateTask, getUserEmail } from '../api';
+import './TaskManager.css';
 
 export default function TaskManager({ user, onNavigate }) {
   const [tasks, setTasks] = useState([]);
@@ -11,6 +12,7 @@ export default function TaskManager({ user, onNavigate }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [notification, setNotification] = useState(null);
+  const [searchFilter, setSearchFilter] = useState('');
 
   // Edit modal state (allowed strictly for Pending tasks)
   const [editingTask, setEditingTask] = useState(null);
@@ -30,7 +32,7 @@ export default function TaskManager({ user, onNavigate }) {
     }, 4000);
   }, []);
 
-  /* ── Load Tasks ──────────────────────────────────────────────── */
+  /* ── Load Tasks (Manual Refresh) ────────────────────────────── */
   const loadTasks = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
@@ -52,9 +54,28 @@ export default function TaskManager({ user, onNavigate }) {
     }
   }, [showNotification]);
 
+  /* ── Initial Load on Mount ───────────────────────────────────── */
   useEffect(() => {
-    loadTasks();
-  }, [loadTasks]);
+    let ignore = false;
+    getTasks()
+      .then((data) => {
+        if (!ignore) {
+          const taskList = Array.isArray(data) ? data : (data.tasks || []);
+          setTasks(taskList);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!ignore) {
+          console.error('Fetch tasks error:', err);
+          setError(err.message || 'Failed to load task information.');
+          setLoading(false);
+        }
+      });
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   /* ── Open Edit for Pending Task ──────────────────────────────── */
   const handleOpenEdit = (task) => {
@@ -120,21 +141,38 @@ export default function TaskManager({ user, onNavigate }) {
     }
   };
 
+  /* ── Filtered Tasks ─────────────────────────────────────────── */
+  const filteredTasks = useMemo(() => {
+    const q = searchFilter.toLowerCase().trim();
+    if (!q) return tasks;
+    return tasks.filter((t) => 
+      (t.title && t.title.toLowerCase().includes(q)) ||
+      (t.description && t.description.toLowerCase().includes(q)) ||
+      (t.priority && t.priority.toLowerCase().includes(q))
+    );
+  }, [tasks, searchFilter]);
+
   /* ── Group tasks by Pending, Onboarding/Ongoing, Completed ──── */
-  const pendingTasks = tasks.filter((t) => {
-    const s = t.status || (t.completed ? 'Completed' : 'Pending');
-    return s === 'Pending';
-  });
+  const pendingTasks = useMemo(() => {
+    return filteredTasks.filter((t) => {
+      const s = t.status || (t.completed ? 'Completed' : 'Pending');
+      return s === 'Pending';
+    });
+  }, [filteredTasks]);
 
-  const onboardingTasks = tasks.filter((t) => {
-    const s = t.status || (t.completed ? 'Completed' : 'Pending');
-    return s === 'Ongoing' || s === 'Onboarding' || s === 'In Progress';
-  });
+  const onboardingTasks = useMemo(() => {
+    return filteredTasks.filter((t) => {
+      const s = t.status || (t.completed ? 'Completed' : 'Pending');
+      return s === 'Ongoing' || s === 'Onboarding' || s === 'In Progress';
+    });
+  }, [filteredTasks]);
 
-  const completedTasks = tasks.filter((t) => {
-    const s = t.status || (t.completed ? 'Completed' : 'Pending');
-    return s === 'Completed';
-  });
+  const completedTasks = useMemo(() => {
+    return filteredTasks.filter((t) => {
+      const s = t.status || (t.completed ? 'Completed' : 'Pending');
+      return s === 'Completed';
+    });
+  }, [filteredTasks]);
 
   const formatDate = (isoString) => {
     if (!isoString) return 'Recently';
@@ -145,9 +183,19 @@ export default function TaskManager({ user, onNavigate }) {
     });
   };
 
+  const getPriorityClass = (priority) => {
+    switch ((priority || '').toLowerCase()) {
+      case 'urgent': return 'priority-urgent';
+      case 'high': return 'priority-high';
+      case 'low': return 'priority-low';
+      case 'medium':
+      default: return 'priority-medium';
+    }
+  };
+
   return (
     <section id="task-page" style={{ padding: '2rem 0 5rem 0' }}>
-      <div className="container" style={{ maxWidth: '840px', margin: '0 auto' }}>
+      <div className="kanban-board-container">
         {notification && (
           <NotificationToast
             type={notification.type}
@@ -158,37 +206,49 @@ export default function TaskManager({ user, onNavigate }) {
 
         {/* ── Page Header ─────────────────────────────────────────── */}
         <Reveal>
-          <div style={{ marginBottom: '2.5rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-              <div>
-                <span
-                  style={{
-                    fontFamily: 'var(--font-code)',
-                    fontSize: '0.8rem',
-                    color: 'var(--accent-secondary)',
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    display: 'block',
-                    marginBottom: '0.4rem'
-                  }}
-                >
-                  Task Status Information
-                </span>
-                <h1 style={{ fontSize: '2.2rem', fontWeight: 800, margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>
-                  Task Details by Stage
-                </h1>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: 0, lineHeight: 1.6 }}>
-                  Information and live details for <strong>Pending</strong>, <strong>Onboarding</strong>, and <strong>Completed</strong> tasks.
-                </p>
+          <div className="kanban-header-bar">
+            <div className="kanban-header-left">
+              <span className="kanban-pretitle">
+                Visual Workflow Pipeline
+              </span>
+              <h1 className="kanban-title">
+                Task Kanban Board
+              </h1>
+              <p className="kanban-subtitle">
+                Live interactive stage board tracking <strong>Pending</strong>, <strong>Onboarding</strong>, and <strong>Completed</strong> deliverables.
+              </p>
+            </div>
+
+            <div className="kanban-header-actions">
+              <div className="kanban-stats-pill">
+                <span>📋 Total Tasks:</span>
+                <strong>{tasks.length}</strong>
               </div>
+
+              {tasks.length > 3 && (
+                <input
+                  type="text"
+                  placeholder="Filter tasks..."
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  style={{
+                    padding: '0.4rem 0.75rem',
+                    borderRadius: '8px',
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-surface)',
+                    color: 'var(--color-foreground)',
+                    fontSize: '0.85rem'
+                  }}
+                />
+              )}
 
               <button
                 className="btn btn-ghost"
                 onClick={() => loadTasks(true)}
                 disabled={loading || refreshing}
-                style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+                style={{ padding: '0.4rem 0.85rem', fontSize: '0.85rem' }}
               >
-                {refreshing ? 'Refreshing...' : '🔄 Refresh Details'}
+                {refreshing ? 'Refreshing...' : '🔄 Refresh Board'}
               </button>
             </div>
           </div>
@@ -199,241 +259,214 @@ export default function TaskManager({ user, onNavigate }) {
         ) : error ? (
           <ErrorMessage message={error} onRetry={() => loadTasks(false)} />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+          <div className="kanban-grid">
             {/* ═══════════════════════════════════════════════════════════
-                1. PENDING TASKS SECTION
+                COLUMN 1: PENDING TASKS
                 ═══════════════════════════════════════════════════════════ */}
-            <Reveal delay={100}>
-              <div style={{ borderLeft: '4px solid #F59E0B', paddingLeft: '1.25rem', marginBottom: '1.25rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <h2 style={{ fontSize: '1.45rem', fontWeight: 800, margin: 0, color: '#F59E0B' }}>
-                    🟡 Pending Tasks ({pendingTasks.length})
-                  </h2>
+            <div className="kanban-column">
+              <div className="kanban-column-header">
+                <div className="kanban-column-top">
+                  <div className="kanban-column-title-group">
+                    <span className="kanban-column-icon">🟡</span>
+                    <h2 className="kanban-column-title">Pending</h2>
+                  </div>
+                  <span className="kanban-badge kanban-badge-pending">
+                    {pendingTasks.length}
+                  </span>
                 </div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', margin: '0.35rem 0 0 0' }}>
-                  Tasks awaiting execution. Task details can be edited before starting work.
+                <p className="kanban-column-desc">
+                  Tasks awaiting execution. Details editable before pickup.
                 </p>
               </div>
 
-              {pendingTasks.length === 0 ? (
-                <div style={{ padding: '1.25rem', background: 'rgba(245, 158, 11, 0.04)', borderRadius: '8px', border: '1px dashed rgba(245, 158, 11, 0.25)', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                  No tasks currently in Pending status.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                  {pendingTasks.map((task) => {
+              <div className="kanban-column-body">
+                {pendingTasks.length === 0 ? (
+                  <div className="kanban-empty">
+                    <span className="kanban-empty-icon">📝</span>
+                    <span>No pending tasks waiting</span>
+                  </div>
+                ) : (
+                  pendingTasks.map((task) => {
                     const taskId = task._id || task.id;
                     return (
-                      <div
-                        key={taskId}
-                        style={{
-                          padding: '1.4rem',
-                          borderRadius: '10px',
-                          background: 'rgba(255, 255, 255, 0.02)',
-                          border: '1px solid rgba(245, 158, 11, 0.25)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '0.85rem'
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
-                          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
-                            {task.title}
-                          </h3>
-                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '4px', background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B' }}>
-                              Pending • {task.priority || 'Medium'} Priority
-                            </span>
-                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                              {formatDate(task.createdAt)}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: 1.6 }}>
-                          {task.description || <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>No description provided.</span>}
-                        </div>
-
-                        {/* Options underneath Pending Task */}
-                        <div style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                            ✏️ Edit option active (Pending only)
+                      <div key={taskId} className="kanban-card kanban-card-pending">
+                        <div className="kanban-card-meta">
+                          <span className={`kanban-priority-badge ${getPriorityClass(task.priority)}`}>
+                            {task.priority || 'Medium'}
                           </span>
+                          <span className="kanban-date">{formatDate(task.createdAt)}</span>
+                        </div>
 
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <h3 className="kanban-card-title">{task.title}</h3>
+
+                        <p className="kanban-card-desc">
+                          {task.description || <span style={{ fontStyle: 'italic', opacity: 0.6 }}>No description provided.</span>}
+                        </p>
+
+                        <div className="kanban-card-footer">
+                          <span className="kanban-card-status-label">✏️ Editable</span>
+                          <div className="kanban-btn-group">
                             <button
-                              className="btn btn-ghost"
-                              style={{ padding: '0.35rem 0.75rem', fontSize: '0.82rem' }}
+                              type="button"
+                              className="kanban-btn kanban-btn-edit"
                               onClick={() => handleOpenEdit(task)}
+                              title="Edit task details"
                             >
-                              ✏️ Edit Task Details
+                              Edit
                             </button>
                             <button
-                              className="btn btn-primary"
-                              style={{ padding: '0.35rem 0.85rem', fontSize: '0.82rem', background: 'linear-gradient(135deg, #00D4FF, #0284C7)' }}
+                              type="button"
+                              className="kanban-btn kanban-btn-start"
                               onClick={() => handleAdvanceStatus(task, 'Ongoing')}
+                              title="Advance to Onboarding / In Progress"
                             >
-                              ▶️ Start Onboarding / Ongoing
+                              ▶️ Start
                             </button>
                           </div>
                         </div>
                       </div>
                     );
-                  })}
-                </div>
-              )}
-            </Reveal>
+                  })
+                )}
+              </div>
+            </div>
 
             {/* ═══════════════════════════════════════════════════════════
-                2. ONBOARDING / ONGOING TASKS SECTION
+                COLUMN 2: ONBOARDING / ONGOING TASKS
                 ═══════════════════════════════════════════════════════════ */}
-            <Reveal delay={150}>
-              <div style={{ borderLeft: '4px solid #00D4FF', paddingLeft: '1.25rem', marginBottom: '1.25rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <h2 style={{ fontSize: '1.45rem', fontWeight: 800, margin: 0, color: '#00D4FF' }}>
-                    🔵 Onboarding &amp; Ongoing Tasks ({onboardingTasks.length})
-                  </h2>
+            <div className="kanban-column">
+              <div className="kanban-column-header">
+                <div className="kanban-column-top">
+                  <div className="kanban-column-title-group">
+                    <span className="kanban-column-icon">🔵</span>
+                    <h2 className="kanban-column-title">In Progress</h2>
+                  </div>
+                  <span className="kanban-badge kanban-badge-ongoing">
+                    {onboardingTasks.length}
+                  </span>
                 </div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', margin: '0.35rem 0 0 0' }}>
-                  Tasks actively in progress. Content editing is locked once work has started.
+                <p className="kanban-column-desc">
+                  Actively in development. Content editing is locked.
                 </p>
               </div>
 
-              {onboardingTasks.length === 0 ? (
-                <div style={{ padding: '1.25rem', background: 'rgba(0, 212, 255, 0.04)', borderRadius: '8px', border: '1px dashed rgba(0, 212, 255, 0.25)', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                  No tasks currently in Onboarding or Ongoing progress.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                  {onboardingTasks.map((task) => {
+              <div className="kanban-column-body">
+                {onboardingTasks.length === 0 ? (
+                  <div className="kanban-empty">
+                    <span className="kanban-empty-icon">⚡</span>
+                    <span>No tasks actively underway</span>
+                  </div>
+                ) : (
+                  onboardingTasks.map((task) => {
                     const taskId = task._id || task.id;
                     return (
-                      <div
-                        key={taskId}
-                        style={{
-                          padding: '1.4rem',
-                          borderRadius: '10px',
-                          background: 'rgba(255, 255, 255, 0.02)',
-                          border: '1px solid rgba(0, 212, 255, 0.25)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '0.85rem'
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
-                          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
-                            {task.title}
-                          </h3>
-                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '4px', background: 'rgba(0, 212, 255, 0.15)', color: '#00D4FF' }}>
-                              Onboarding / Ongoing • {task.priority || 'Medium'} Priority
-                            </span>
-                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                              {formatDate(task.createdAt)}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: 1.6 }}>
-                          {task.description || <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>No description provided.</span>}
-                        </div>
-
-                        {/* Options underneath Onboarding Task */}
-                        <div style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
-                          <span style={{ fontSize: '0.8rem', color: '#00D4FF' }}>
-                            🔒 In Progress — Editing is locked
+                      <div key={taskId} className="kanban-card kanban-card-ongoing">
+                        <div className="kanban-card-meta">
+                          <span className={`kanban-priority-badge ${getPriorityClass(task.priority)}`}>
+                            {task.priority || 'Medium'}
                           </span>
+                          <span className="kanban-date">{formatDate(task.createdAt)}</span>
+                        </div>
 
-                          <button
-                            className="btn btn-primary"
-                            style={{ padding: '0.35rem 0.85rem', fontSize: '0.82rem', background: 'linear-gradient(135deg, #10B981, #059669)' }}
-                            onClick={() => handleAdvanceStatus(task, 'Completed')}
-                          >
-                            ✅ Mark as Completed
-                          </button>
+                        <h3 className="kanban-card-title">{task.title}</h3>
+
+                        <p className="kanban-card-desc">
+                          {task.description || <span style={{ fontStyle: 'italic', opacity: 0.6 }}>No description provided.</span>}
+                        </p>
+
+                        <div className="kanban-card-footer">
+                          <span className="kanban-card-status-label" style={{ color: 'var(--color-info)' }}>
+                            🔒 Work In Progress
+                          </span>
+                          <div className="kanban-btn-group">
+                            <button
+                              type="button"
+                              className="kanban-btn kanban-btn-complete"
+                              onClick={() => handleAdvanceStatus(task, 'Completed')}
+                              title="Mark this task as completed"
+                            >
+                              ✅ Complete
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
-                  })}
-                </div>
-              )}
-            </Reveal>
+                  })
+                )}
+              </div>
+            </div>
 
             {/* ═══════════════════════════════════════════════════════════
-                3. COMPLETED TASKS SECTION
+                COLUMN 3: COMPLETED TASKS
                 ═══════════════════════════════════════════════════════════ */}
-            <Reveal delay={200}>
-              <div style={{ borderLeft: '4px solid #10B981', paddingLeft: '1.25rem', marginBottom: '1.25rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <h2 style={{ fontSize: '1.45rem', fontWeight: 800, margin: 0, color: '#10B981' }}>
-                    🟢 Completed Tasks ({completedTasks.length})
-                  </h2>
+            <div className="kanban-column">
+              <div className="kanban-column-header">
+                <div className="kanban-column-top">
+                  <div className="kanban-column-title-group">
+                    <span className="kanban-column-icon">🟢</span>
+                    <h2 className="kanban-column-title">Completed</h2>
+                  </div>
+                  <span className="kanban-badge kanban-badge-completed">
+                    {completedTasks.length}
+                  </span>
                 </div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', margin: '0.35rem 0 0 0' }}>
-                  Finished deliverables. Tasks are locked and evaluated.
+                <p className="kanban-column-desc">
+                  Finished deliverables evaluated by the team lead.
                 </p>
               </div>
 
-              {completedTasks.length === 0 ? (
-                <div style={{ padding: '1.25rem', background: 'rgba(16, 185, 129, 0.04)', borderRadius: '8px', border: '1px dashed rgba(16, 185, 129, 0.25)', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                  No tasks currently completed.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                  {completedTasks.map((task) => {
+              <div className="kanban-column-body">
+                {completedTasks.length === 0 ? (
+                  <div className="kanban-empty">
+                    <span className="kanban-empty-icon">🏆</span>
+                    <span>No completed tasks yet</span>
+                  </div>
+                ) : (
+                  completedTasks.map((task) => {
                     const taskId = task._id || task.id;
                     return (
-                      <div
-                        key={taskId}
-                        style={{
-                          padding: '1.4rem',
-                          borderRadius: '10px',
-                          background: 'rgba(255, 255, 255, 0.02)',
-                          border: '1px solid rgba(16, 185, 129, 0.25)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '0.85rem'
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
-                          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
-                            {task.title}
-                          </h3>
-                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.15)', color: '#10B981' }}>
-                              Completed
-                            </span>
-                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                              {formatDate(task.createdAt)}
-                            </span>
-                          </div>
+                      <div key={taskId} className="kanban-card kanban-card-completed">
+                        <div className="kanban-card-meta">
+                          <span className="kanban-badge kanban-badge-completed" style={{ fontSize: '0.7rem' }}>
+                            ✓ Done
+                          </span>
+                          <span className="kanban-date">{formatDate(task.createdAt)}</span>
                         </div>
 
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: 1.6 }}>
-                          {task.description || <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>No description provided.</span>}
-                        </div>
+                        <h3 className="kanban-card-title">{task.title}</h3>
 
-                        {/* Evaluation verdict if available */}
+                        <p className="kanban-card-desc">
+                          {task.description || <span style={{ fontStyle: 'italic', opacity: 0.6 }}>No description provided.</span>}
+                        </p>
+
+                        {/* Evaluation verdict if reviewed */}
                         {task.evaluationVerdict && task.evaluationVerdict !== 'Pending Evaluation' && (
-                          <div style={{ padding: '0.65rem 0.85rem', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', fontSize: '0.82rem' }}>
-                            <strong style={{ color: '#10B981' }}>Evaluation: {task.evaluationVerdict}</strong>
-                            {task.evaluationScore && <span> • Score: {task.evaluationScore}/100</span>}
-                            {task.evaluationNotes && <div style={{ color: 'var(--text-secondary)', fontStyle: 'italic', marginTop: '0.2rem' }}>"{task.evaluationNotes}"</div>}
+                          <div className="kanban-eval-box">
+                            <div>
+                              <span className="kanban-eval-verdict">
+                                {task.evaluationVerdict}
+                              </span>
+                              {task.evaluationScore ? ` • Score: ${task.evaluationScore}/100` : ''}
+                            </div>
+                            {task.evaluationNotes && (
+                              <div className="kanban-eval-notes">
+                                "{task.evaluationNotes}"
+                              </div>
+                            )}
                           </div>
                         )}
 
-                        {/* Options underneath Completed Task */}
-                        <div style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.8rem', color: '#10B981' }}>
-                            ✓ Deliverable finalized and locked
+                        <div className="kanban-card-footer">
+                          <span className="kanban-card-status-label" style={{ color: 'var(--color-success)' }}>
+                            ✓ Finalized Deliverable
                           </span>
                         </div>
                       </div>
                     );
-                  })}
-                </div>
-              )}
-            </Reveal>
+                  })
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>

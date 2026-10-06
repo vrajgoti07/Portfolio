@@ -33,7 +33,7 @@ export default function AdminDashboard({ onNavigate }) {
 
   const [users, setUsers] = useState([]);
   const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => Boolean(isAdmin));
   const [error, setError] = useState('');
   const [notification, setNotification] = useState(null);
 
@@ -62,7 +62,7 @@ export default function AdminDashboard({ onNavigate }) {
     }, 4000);
   }, []);
 
-  // Fetch users and tasks
+  // Fetch users and tasks (manual refresh)
   const loadDashboardData = useCallback(async () => {
     if (!isAdmin) {
       setLoading(false);
@@ -92,9 +92,35 @@ export default function AdminDashboard({ onNavigate }) {
     }
   }, [isAdmin, assignedTo]);
 
+  /* ── Initial Fetch on Mount ─────────────────────────────────── */
   useEffect(() => {
-    loadDashboardData();
-  }, [loadDashboardData]);
+    if (!isAdmin) {
+      return;
+    }
+    let ignore = false;
+    Promise.all([getAdminUsers(), getTasks()])
+      .then(([usersData, tasksData]) => {
+        if (!ignore) {
+          const fetchedUsers = usersData.users || [];
+          setUsers(fetchedUsers);
+          if (fetchedUsers.length > 0) {
+            setAssignedTo((prev) => prev || fetchedUsers[0].email);
+          }
+          setTasks(Array.isArray(tasksData) ? tasksData : []);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!ignore) {
+          console.error('Admin dashboard load error:', err);
+          setError(err.message || 'Failed to load admin data.');
+          setLoading(false);
+        }
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [isAdmin]);
 
   // Handle Assign Task
   const handleAssignTask = async (e) => {
@@ -636,7 +662,7 @@ export default function AdminDashboard({ onNavigate }) {
                   {/* Evaluation Button */}
                   <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                      {new Date(task.createdAt || Date.now()).toLocaleDateString()}
+                      {task.createdAt ? new Date(task.createdAt).toLocaleDateString() : 'Recent'}
                     </span>
 
                     <button

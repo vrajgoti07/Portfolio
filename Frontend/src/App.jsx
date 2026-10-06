@@ -1,21 +1,32 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
-import ProjectsPage from './pages/ProjectsPage';
-import TaskPage from './pages/TaskPage';
-import ContactPage from './pages/ContactPage';
 import SkillsPage from './pages/SkillsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import AdminDashboard from './pages/AdminDashboard';
 import NotFound from './pages/NotFound';
 import NotificationToast from './components/NotificationToast';
+import PageLoader from './components/PageLoader';
+import ScrollProgress from './components/ScrollProgress';
 import { getToken, removeToken, getMe } from './api';
 
+// Route-based Code Splitting (React.lazy)
+const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const TaskPage = lazy(() => import('./pages/TaskPage'));
+
+// Stable navigation configuration to prevent unnecessary Navbar re-renders
+const NAV_ITEMS = [
+  { label: 'Home', path: '/' },
+  { label: 'Tasks', path: '/tasks' },
+  { label: 'Projects', path: '/projects' },
+  { label: 'Contact', path: '/contact' },
+];
+
 export default function App() {
-  const [scrollProgress, setScrollProgress] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // Theme state: defaults to dark mode, saved in local storage
@@ -61,18 +72,6 @@ export default function App() {
     };
     window.addEventListener('popstate', handleLocationChange);
     return () => window.removeEventListener('popstate', handleLocationChange);
-  }, []);
-
-  // Scroll progress tracker
-  useEffect(() => {
-    const handleScroll = () => {
-      const totalScroll = document.documentElement.scrollHeight - window.innerHeight;
-      if (totalScroll > 0) {
-        setScrollProgress((window.scrollY / totalScroll) * 100);
-      }
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   // Fetch current user details if token is present
@@ -138,13 +137,6 @@ export default function App() {
     handleNavigate('/login');
   };
 
-  const navItems = [
-    { label: 'Home', path: '/' },
-    { label: 'Tasks', path: '/tasks' },
-    { label: 'Projects', path: '/projects' },
-    { label: 'Contact', path: '/contact' },
-  ];
-
   const isAdmin = (user?.email || '').toLowerCase().trim() === 'vrajgoti07@gmail.com' || user?.role === 'admin';
 
   const renderContent = () => {
@@ -180,11 +172,8 @@ export default function App() {
 
   return (
     <>
-      {/* Scroll progress bar */}
-      <div
-        className="scroll-progress"
-        style={{ width: `${scrollProgress}%` }}
-      />
+      {/* Isolated scroll progress bar to avoid App-level re-renders */}
+      <ScrollProgress />
 
       {/* Global Notification Toast */}
       {globalNotification && (
@@ -203,7 +192,7 @@ export default function App() {
         setMobileOpen={setMobileOpen}
         theme={theme}
         onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-        navItems={navItems}
+        navItems={NAV_ITEMS}
         user={user}
         isAuthenticated={Boolean(token)}
         onLogout={handleLogout}
@@ -211,7 +200,7 @@ export default function App() {
 
       {/* Mobile menu */}
       <div className={`mobile-menu ${mobileOpen ? 'open' : ''}`}>
-        {navItems.map((item) => (
+        {NAV_ITEMS.map((item) => (
           <button
             key={item.path}
             className="mobile-nav-link"
@@ -227,7 +216,7 @@ export default function App() {
         {isAdmin && (
           <button
             className="mobile-nav-link"
-            style={{ color: '#F59E0B', fontWeight: 700 }}
+            style={{ color: 'var(--color-warning, #F59E0B)', fontWeight: 700 }}
             onClick={() => handleNavigate('/admin')}
           >
             <span>👑 Admin Dashboard</span>
@@ -237,7 +226,7 @@ export default function App() {
         {token ? (
           <button
             className="mobile-nav-link"
-            style={{ color: '#EF4444' }}
+            style={{ color: 'var(--color-danger, #EF4444)' }}
             onClick={handleLogout}
           >
             <span>Logout ({user?.email || 'User'})</span>
@@ -260,9 +249,11 @@ export default function App() {
         )}
       </div>
 
-      {/* Pages */}
-      <main>
-        {renderContent()}
+      {/* Route-level Suspense Boundary */}
+      <main id="main-content">
+        <Suspense fallback={<PageLoader />}>
+          {renderContent()}
+        </Suspense>
       </main>
 
       <Footer />

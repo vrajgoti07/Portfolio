@@ -1,10 +1,15 @@
-const BASE_URL = "http://localhost:5000";
+/**
+ * Centralized API Layer with JWT Authentication Support
+ * Connects to Express + MongoDB backend on http://localhost:5000/api
+ */
+
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 /**
  * Helper to retrieve stored JWT token from localStorage.
  */
 export function getToken() {
-  return localStorage.getItem("token");
+  return localStorage.getItem("token") || localStorage.getItem("awdf_token");
 }
 
 /**
@@ -13,9 +18,22 @@ export function getToken() {
 export function setToken(token) {
   if (token) {
     localStorage.setItem("token", token);
+    localStorage.setItem("awdf_token", token);
   } else {
     localStorage.removeItem("token");
+    localStorage.removeItem("awdf_token");
   }
+}
+
+/**
+ * Helper to remove token and user session details.
+ */
+export function removeToken() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("awdf_token");
+  localStorage.removeItem("user_email");
+  localStorage.removeItem("user_role");
+  localStorage.removeItem("user_name");
 }
 
 /**
@@ -33,7 +51,7 @@ export function getUserRole() {
 }
 
 /**
- * Helper to check if current logged in user is admin.
+ * Helper to check if current logged-in user is admin.
  */
 export function isAdminUser() {
   const email = (getUserEmail() || "").toLowerCase().trim();
@@ -42,54 +60,46 @@ export function isAdminUser() {
 }
 
 /**
- * Helper to remove token and user details (Logout).
- */
-export function removeToken() {
-  localStorage.removeItem("token");
-  localStorage.removeItem("user_email");
-  localStorage.removeItem("user_role");
-  localStorage.removeItem("user_name");
-}
-
-/**
- * Centralized headers generator with Bearer JWT if available.
+ * Build request headers, optionally attaching Bearer token
  */
 function getHeaders(includeAuth = true) {
   const headers = {
     "Content-Type": "application/json"
   };
+
   if (includeAuth) {
     const token = getToken();
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
   }
+
   return headers;
 }
 
 /**
- * Generic response handler with 401 automatic token cleanup.
+ * Helper to handle fetch responses, parse JSON, and handle errors (including 401)
  */
-async function handleResponse(response, customErrorMessage, suppressUnauthorized = false) {
-  if (response.status === 401) {
-    if (!suppressUnauthorized) {
-      removeToken();
-      window.dispatchEvent(new CustomEvent("auth:unauthorized"));
-    }
-    const errorData = await response.json().catch(() => ({}));
-    const err = new Error(errorData.message || "Session expired or unauthorized. Please login again.");
-    err.status = 401;
-    throw err;
+async function handleResponse(response, defaultErrorMsg = "Request failed", suppressRedirect = false) {
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (response.status === 401 && !suppressRedirect) {
+    removeToken();
+    window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+    throw new Error(data?.message || "Session expired. Please sign in again.");
   }
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const err = new Error(errorData.message || `${customErrorMessage} (HTTP ${response.status})`);
-    err.status = response.status;
-    throw err;
+    const errorMessage = data?.message || data?.error || defaultErrorMsg;
+    throw new Error(errorMessage);
   }
 
-  return await response.json();
+  return data;
 }
 
 /**
@@ -106,7 +116,7 @@ export async function registerUser(email, password, name = "") {
     return await handleResponse(response, "Registration failed");
   } catch (error) {
     if (error.name === "TypeError" && error.message.includes("fetch")) {
-      throw new Error("Unable to connect to backend server. Please make sure backend is running on port 5000.");
+      throw new Error("Unable to connect to backend server. Please make sure backend is running on port 5000.", { cause: error });
     }
     throw error;
   }
@@ -137,7 +147,7 @@ export async function loginUser(email, password) {
     return data;
   } catch (error) {
     if (error.name === "TypeError" && error.message.includes("fetch")) {
-      throw new Error("Unable to connect to backend server. Please make sure backend is running on port 5000.");
+      throw new Error("Unable to connect to backend server. Please make sure backend is running on port 5000.", { cause: error });
     }
     throw error;
   }
@@ -157,7 +167,7 @@ export async function forgotPassword(email, newPassword) {
     return await handleResponse(response, "Password reset failed");
   } catch (error) {
     if (error.name === "TypeError" && error.message.includes("fetch")) {
-      throw new Error("Unable to connect to backend server.");
+      throw new Error("Unable to connect to backend server.", { cause: error });
     }
     throw error;
   }
@@ -182,7 +192,7 @@ export async function getMe() {
     return userData;
   } catch (error) {
     if (error.name === "TypeError" && error.message.includes("fetch")) {
-      throw new Error("Unable to connect to backend server.");
+      throw new Error("Unable to connect to backend server.", { cause: error });
     }
     throw error;
   }
@@ -207,7 +217,7 @@ export async function getTasks(queryParams = {}) {
     return await handleResponse(response, "Failed to fetch tasks", true);
   } catch (error) {
     if (error.name === "TypeError" && error.message.includes("fetch")) {
-      throw new Error("Unable to connect to backend server on port 5000.");
+      throw new Error("Unable to connect to backend server on port 5000.", { cause: error });
     }
     throw error;
   }
@@ -226,7 +236,7 @@ export async function getTaskById(id) {
     return await handleResponse(response, "Failed to fetch task", true);
   } catch (error) {
     if (error.name === "TypeError" && error.message.includes("fetch")) {
-      throw new Error("Unable to connect to backend server.");
+      throw new Error("Unable to connect to backend server.", { cause: error });
     }
     throw error;
   }
@@ -246,7 +256,7 @@ export async function createTask(taskData) {
     return await handleResponse(response, "Failed to create task");
   } catch (error) {
     if (error.name === "TypeError" && error.message.includes("fetch")) {
-      throw new Error("Unable to connect to backend server.");
+      throw new Error("Unable to connect to backend server.", { cause: error });
     }
     throw error;
   }
@@ -266,7 +276,7 @@ export async function updateTask(id, taskData) {
     return await handleResponse(response, "Failed to update task");
   } catch (error) {
     if (error.name === "TypeError" && error.message.includes("fetch")) {
-      throw new Error("Unable to connect to backend server.");
+      throw new Error("Unable to connect to backend server.", { cause: error });
     }
     throw error;
   }
@@ -285,7 +295,7 @@ export async function deleteTask(id) {
     return await handleResponse(response, "Failed to delete task");
   } catch (error) {
     if (error.name === "TypeError" && error.message.includes("fetch")) {
-      throw new Error("Unable to connect to backend server.");
+      throw new Error("Unable to connect to backend server.", { cause: error });
     }
     throw error;
   }
@@ -304,7 +314,7 @@ export async function getAdminUsers() {
     return await handleResponse(response, "Failed to fetch team users for admin");
   } catch (error) {
     if (error.name === "TypeError" && error.message.includes("fetch")) {
-      throw new Error("Unable to connect to backend server.");
+      throw new Error("Unable to connect to backend server.", { cause: error });
     }
     throw error;
   }
@@ -324,7 +334,7 @@ export async function assignAdminTask(taskData) {
     return await handleResponse(response, "Failed to assign task");
   } catch (error) {
     if (error.name === "TypeError" && error.message.includes("fetch")) {
-      throw new Error("Unable to connect to backend server.");
+      throw new Error("Unable to connect to backend server.", { cause: error });
     }
     throw error;
   }
@@ -344,7 +354,7 @@ export async function evaluateAdminTask(taskId, evaluationData) {
     return await handleResponse(response, "Failed to submit evaluation");
   } catch (error) {
     if (error.name === "TypeError" && error.message.includes("fetch")) {
-      throw new Error("Unable to connect to backend server.");
+      throw new Error("Unable to connect to backend server.", { cause: error });
     }
     throw error;
   }

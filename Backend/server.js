@@ -21,6 +21,16 @@ const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/awdf_db";
 app.use(cors());
 app.use(express.json());
 
+// Support both /api/... and /... routes transparently
+app.use((req, res, next) => {
+  if (req.url.startsWith('/api/')) {
+    req.url = req.url.slice(4);
+  } else if (req.url === '/api') {
+    req.url = '/';
+  }
+  next();
+});
+
 // Seed/Guarantee Admin Account: vrajgoti07@gmail.com / 123456789
 const seedAdminAccount = async () => {
   try {

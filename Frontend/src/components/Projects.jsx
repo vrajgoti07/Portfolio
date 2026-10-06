@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Reveal from './Reveal';
 import Spinner from './Spinner';
 import ErrorMessage from './ErrorMessage';
@@ -54,7 +54,7 @@ export default function Projects() {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('newest');
 
-  /* ── Fetch GitHub repositories ──────────────────────────────── */
+  /* ── Fetch GitHub repositories (manual retry) ───────────────── */
   const fetchRepositories = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -73,22 +73,48 @@ export default function Projects() {
     }
   }, []);
 
+  /* ── Initial Fetch on Mount (idiomatic React 19 pattern) ────── */
   useEffect(() => {
-    fetchRepositories();
-  }, [fetchRepositories]);
+    let ignore = false;
+    async function loadInitial() {
+      try {
+        const response = await fetch(GITHUB_API_URL);
+        if (!response.ok) {
+          throw new Error(`GitHub API responded with status ${response.status}`);
+        }
+        const data = await response.json();
+        if (!ignore) {
+          setRepos(Array.isArray(data) ? data : []);
+          setLoading(false);
+        }
+      } catch (err) {
+        if (!ignore) {
+          console.error('GitHub fetch error:', err);
+          setError('Unable to fetch GitHub repositories. Please check your internet connection and retry.');
+          setLoading(false);
+        }
+      }
+    }
+    loadInitial();
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
-  /* ── Filtered & Sorted Repos ────────────────────────────────── */
-  const filteredAndSorted = repos
-    .filter((repo) => {
-      const query = search.toLowerCase().trim();
-      if (!query) return true;
-      return (
-        repo.name.toLowerCase().includes(query) ||
-        (repo.description && repo.description.toLowerCase().includes(query)) ||
-        (repo.language && repo.language.toLowerCase().includes(query))
-      );
-    })
-    .sort(getSortComparator(sort));
+  /* ── Memoized Filtered & Sorted Repos ────────────────────────── */
+  const filteredAndSorted = useMemo(() => {
+    return repos
+      .filter((repo) => {
+        const query = search.toLowerCase().trim();
+        if (!query) return true;
+        return (
+          repo.name.toLowerCase().includes(query) ||
+          (repo.description && repo.description.toLowerCase().includes(query)) ||
+          (repo.language && repo.language.toLowerCase().includes(query))
+        );
+      })
+      .sort(getSortComparator(sort));
+  }, [repos, search, sort]);
 
   return (
     <section id="projects" className="projects-page-section">

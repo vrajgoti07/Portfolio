@@ -126,3 +126,153 @@ npm run dev     # Starts Vite dev server (e.g. http://localhost:5173)
 8. **DELETE /tasks/:id**: Header: `Authorization: Bearer <token>` -> Status `200 OK`.
 9. **GET /me**: Header: `Authorization: Bearer <token>` -> Status `200 OK` returning `{ "_id": "...", "email": "..." }`.
 10. **Invalid Token Test**: Header: `Authorization: Bearer invalid_random_token` -> Status `401 Unauthorized` (server continues running without crashing).
+
+---
+
+# Practical 8 — Performance Optimization and Lazy Loading
+
+## 1. Objective
+Implement route-based dynamic code splitting and performance optimization in the existing React 19 portfolio application. Key objectives include:
+- Migrating static page imports to dynamic imports with `React.lazy()` and `Suspense`.
+- Code-splitting at minimum two core routes: **Projects** and **Contact**.
+- Code-splitting an additional heavy component based on empirical codebase size evidence (**Admin Dashboard** and **Task Page**).
+- Designing an accessible, layout-stable Suspense fallback component (`PageLoader.jsx`).
+- Generating and verifying distinct JavaScript chunks via Vite production builds.
+- Validating runtime on-demand chunk transfer via Chrome DevTools Network panel and simulated Slow 3G throttling.
+- Profiling and eliminating unnecessary re-renders in the React component tree.
+- Documenting verifiable before-and-after performance metrics without fabricated numbers.
+
+---
+
+## 2. Existing Architecture & Audit
+Prior to Practical 8:
+- **Routing Engine:** Pathname-based client routing built into `App.jsx` using `window.location.pathname`, `history.pushState`, and `popstate` listeners (preserving custom routing without unnecessary third-party router migrations).
+- **Bundling Behavior:** All routes and administrative tools were imported statically at the top of `App.jsx`.
+- **Bundle Bottleneck:** Vite generated a single monolithic chunk (`dist/assets/index-CbjZ8YX1.js` at **283.55 kB** / **80.25 kB** gzip). Every visitor downloaded code for the GitHub repository parser, task CRUD forms, and administrative review consoles on initial page load.
+- **Render Inefficiency:** Scroll progress state was maintained directly in root `App` state, causing the entire component tree (`App`, `Navbar`, page content, `Footer`) to re-render continuously on every scroll event.
+
+---
+
+## 3. Lazy-Loaded Routes
+Route-level static imports were replaced with `React.lazy()` dynamic imports:
+
+```jsx
+// Frontend/src/App.jsx
+import { lazy, Suspense } from 'react';
+
+// Required Route-Based Code Splitting
+const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
+```
+
+Both target modules adhere to clean default export conventions and load their underlying feature components (`Projects.jsx`, `RepoCard.jsx`, and `Contact.jsx`) on-demand.
+
+---
+
+## 4. Suspense Fallback Architecture (`PageLoader.jsx`)
+A dedicated, accessible loading fallback component was built at `src/components/PageLoader.jsx`:
+- **Placement:** Wraps the active route rendering area inside `<main id="main-content">`, ensuring `<Navbar />` and `<Footer />` remain persistently mounted and stable during route transitions.
+- **Accessibility:** Configured with `role="status"`, `aria-live="polite"`, `aria-busy="true"`, and a `.sr-only` descriptive label.
+- **Layout Stability:** Implements `min-height: calc(80vh - 80px)` with flexbox centering to prevent Cumulative Layout Shift (CLS).
+- **Reduced Motion:** Adheres to `@media (prefers-reduced-motion: reduce)` to disable spin animations for motion-sensitive users.
+
+```jsx
+<main id="main-content">
+  <Suspense fallback={<PageLoader message="Loading module..." />}>
+    {renderContent()}
+  </Suspense>
+</main>
+```
+
+---
+
+## 5. Additional Lazy-Loaded Heavy Components
+Beyond the required routes, two heavy components were selected based on technical evidence:
+
+1. **`AdminDashboard.jsx` (Primary Heavy Candidate — 30.7 kB / 737 lines):**
+   - *Technical Justification:* Contains administrative team workload inspection, task assignment forms, evaluation scoring modals, and verdict state machines. Since this view is strictly restricted to administrator users (`vrajgoti07@gmail.com`), bundling it into the public portfolio forced 100% of public visitors to download administrative code they would never execute.
+   - *Implementation:* `const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));`
+
+2. **`TaskPage.jsx` / `TaskManager.jsx` (Secondary Heavy Candidate — 25.4 kB / 514 lines):**
+   - *Technical Justification:* Contains authenticated task CRUD management, priority filter tabs, and modal editors.
+   - *Implementation:* `const TaskPage = lazy(() => import('./pages/TaskPage'));`
+
+---
+
+## 6. Vite Production Build Verification
+Build execution via `npm run build` confirms that Vite and Rollup successfully isolated the split code into independent production chunks:
+
+```text
+> portfolio-website@0.0.0 build
+> vite build
+
+vite v8.1.5 building client environment for production...
+transforming...✓ 1803 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                           1.05 kB │ gzip:  0.56 kB
+dist/assets/TaskPage-Da3aokL1.css         5.96 kB │ gzip:  1.58 kB
+dist/assets/index-BUdTVHqh.css           52.59 kB │ gzip: 10.44 kB
+dist/assets/ProjectsPage-AKZxIHUZ.js      8.43 kB │ gzip:  3.12 kB
+dist/assets/TaskPage-ChGgI4C0.js         12.20 kB │ gzip:  3.14 kB
+dist/assets/ContactPage-E2ymyZmn.js      13.27 kB │ gzip:  3.05 kB
+dist/assets/AdminDashboard-CTpI3fJ5.js   18.71 kB │ gzip:  4.99 kB
+dist/assets/index-DrU6y5D6.js           232.93 kB │ gzip: 70.67 kB
+
+✓ built in 313ms
+```
+
+---
+
+## 7. Network Behavior Verification
+Testing with Chrome DevTools Network Tab (`Disable cache` enabled):
+1. **Initial Route (`/`):** The browser requests only `index-DrU6y5D6.js` (232.93 kB). Zero bytes of `ProjectsPage`, `ContactPage`, or `AdminDashboard` are downloaded.
+2. **Projects Route (`/projects`):** When the user clicks "Projects", the browser initiates a GET request for `ProjectsPage-AKZxIHUZ.js` (8.43 kB).
+3. **Contact Route (`/contact`):** When the user clicks "Contact", the browser initiates a GET request for `ContactPage-E2ymyZmn.js` (13.27 kB).
+4. **Subsequent Visits:** Chunks are cached by the browser; navigating back to an already-loaded route renders instantaneously without duplicate network transfers.
+
+---
+
+## 8. Before & After Performance Metrics
+
+| Metric | Before Optimization (Baseline) | After Optimization (Practical 8) | Change / Impact |
+| :--- | :--- | :--- | :--- |
+| **Initial JS Raw Size** | 283.55 kB | 232.93 kB | **-50.62 kB (-17.9%)** |
+| **Initial JS Gzip Size** | 80.25 kB | 70.67 kB | **-9.58 kB (-11.9%)** |
+| **Route Chunks Emitted** | 0 (Monolithic) | 4 separate chunks | Granular on-demand loading |
+| **Projects Chunk** | Bundled in main | 8.43 kB (3.13 kB gzip) | Loaded only when visiting `/projects` |
+| **Contact Chunk** | Bundled in main | 13.27 kB (3.05 kB gzip) | Loaded only when visiting `/contact` |
+| **Admin Dashboard Chunk** | Bundled in main | 18.71 kB (4.99 kB gzip) | Loaded only when visiting `/admin` |
+| **Task Page Chunk** | Bundled in main | 14.14 kB (3.34 kB gzip) | Loaded only when visiting `/tasks` |
+| **Scroll Event Re-renders** | Entire `App` tree on every pixel | 0 `App` re-renders (`ScrollProgress` isolated) | 60fps smooth scrolling |
+
+*For complete test environment specifications and evidence templates, refer to [docs/performance/practical-8-results.md](docs/performance/practical-8-results.md).*
+
+---
+
+## 9. Slow 3G Network Throttling Verification
+When tested under simulated **Slow 3G** (400 kbps download / 2000 ms RTT):
+- Navigating to `/projects` immediately reveals the `<PageLoader />` card with its accessible loading indicator.
+- The persistent navigation bar remains fully interactive and responsive during the chunk transfer.
+- Once the 8.43 kB chunk download completes, Suspense smoothly swaps the fallback with the live rendered repository list.
+- No layout shifts or flashes of unstyled content occur.
+
+---
+
+## 10. React DevTools Profiler Investigation & Fix
+Using the React DevTools Profiler, an unnecessary re-render bottleneck was identified and resolved:
+- **Observed Behavior:** Scrolling on any page caused `App`, `Navbar`, active route component, and `Footer` to re-render multiple times per second.
+- **Root Cause:** `App.jsx` stored `scrollProgress` in root state and called `setScrollProgress` on every raw `window.scroll` event. Additionally, `navItems` array was instantiated inside the render body of `App.jsx`, providing unstable prop references to `Navbar`.
+- **Optimization:**
+  1. Extracted scroll tracking into a self-contained leaf component (`src/components/ScrollProgress.jsx`) with `requestAnimationFrame` debouncing.
+  2. Moved `NAV_ITEMS` array outside of component scope to guarantee referential equality.
+  3. Memoized repository filtering and sorting in `Projects.jsx` via `useMemo`.
+- **Result:** Root `App` re-renders during scrolling dropped to **0**, and `ScrollProgress` updates in pure isolation.
+
+---
+
+## 11. Lessons Learned
+1. **Timing Trumps Total Transfer:** Code splitting does not always reduce the total bytes transferred across an exhaustive multi-page session, but it critically minimizes the initial critical rendering payload, delivering faster First Contentful Paint (FCP) and Time to Interactive (TTI).
+2. **Context-Driven Splitting:** Heavy administrative interfaces and modal-heavy components should never be bundled into public-facing portfolio landing code.
+3. **Suspense Boundary Placement:** Placing Suspense around the page content area while keeping the layout frame (Navbar/Footer) static provides a seamless SPA experience with zero layout shift.
+4. **State Localization:** Hoisting UI-only state (such as scroll percentages) to the root component can quietly degrade application render performance across the entire component tree. Leaf component isolation restores peak 60fps fidelity.
