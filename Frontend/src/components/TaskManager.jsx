@@ -3,7 +3,7 @@ import Reveal from './Reveal';
 import Spinner from './Spinner';
 import ErrorMessage from './ErrorMessage';
 import NotificationToast from './NotificationToast';
-import { getTasks, updateTask, getUserEmail } from '../api';
+import { getTasks, updateTask, deleteTask, getUserEmail } from '../api';
 import './TaskManager.css';
 
 export default function TaskManager({ user, onNavigate }) {
@@ -81,7 +81,7 @@ export default function TaskManager({ user, onNavigate }) {
   const handleOpenEdit = (task) => {
     const status = task.status || (task.completed ? 'Completed' : 'Pending');
     if (status !== 'Pending' && currentUserEmail !== 'vrajgoti07@gmail.com') {
-      showNotification('error', 'Editing locked! Tasks cannot be edited once they are in Onboarding or Completed status.');
+      showNotification('error', 'Editing locked! Tasks cannot be edited once they are in In Progress or Completed status.');
       return;
     }
 
@@ -116,6 +116,34 @@ export default function TaskManager({ user, onNavigate }) {
       showNotification('error', err.message || 'Failed to update task.');
     } finally {
       setUpdating(false);
+    }
+  };
+
+  /* ── Delete Task (Strictly Allowed for Pending Tasks Only) ────── */
+  const handleDeleteTask = async (task) => {
+    if (!isAuthenticated) {
+      showNotification('error', 'Please sign in to remove tasks.');
+      if (onNavigate) onNavigate('/login');
+      return;
+    }
+
+    const status = task.status || (task.completed ? 'Completed' : 'Pending');
+    if (status !== 'Pending' && currentUserEmail !== 'vrajgoti07@gmail.com') {
+      showNotification('error', `Removal locked! Tasks in "${status}" status cannot be removed. Only Pending tasks can be deleted.`);
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to remove pending task "${task.title}"?`)) {
+      return;
+    }
+
+    const taskId = task._id || task.id;
+    try {
+      await deleteTask(taskId);
+      setTasks((prev) => prev.filter((t) => (t._id || t.id) !== taskId));
+      showNotification('success', 'Pending task removed successfully.');
+    } catch (err) {
+      showNotification('error', err.message || 'Failed to remove task.');
     }
   };
 
@@ -275,7 +303,7 @@ export default function TaskManager({ user, onNavigate }) {
                   </span>
                 </div>
                 <p className="kanban-column-desc">
-                  Tasks awaiting execution. Details editable before pickup.
+                  Tasks awaiting execution. Can be edited and removed.
                 </p>
               </div>
 
@@ -304,7 +332,9 @@ export default function TaskManager({ user, onNavigate }) {
                         </p>
 
                         <div className="kanban-card-footer">
-                          <span className="kanban-card-status-label">✏️ Editable</span>
+                          <span className="kanban-card-status-label" style={{ color: 'var(--color-warning)' }}>
+                            ✏️ Editable &amp; Removable
+                          </span>
                           <div className="kanban-btn-group">
                             <button
                               type="button"
@@ -312,13 +342,21 @@ export default function TaskManager({ user, onNavigate }) {
                               onClick={() => handleOpenEdit(task)}
                               title="Edit task details"
                             >
-                              Edit
+                              ✏️ Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="kanban-btn kanban-btn-delete"
+                              onClick={() => handleDeleteTask(task)}
+                              title="Remove pending task"
+                            >
+                              🗑️ Remove
                             </button>
                             <button
                               type="button"
                               className="kanban-btn kanban-btn-start"
                               onClick={() => handleAdvanceStatus(task, 'Ongoing')}
-                              title="Advance to Onboarding / In Progress"
+                              title="Advance to In Progress"
                             >
                               ▶️ Start
                             </button>
@@ -346,7 +384,7 @@ export default function TaskManager({ user, onNavigate }) {
                   </span>
                 </div>
                 <p className="kanban-column-desc">
-                  Actively in development. Content editing is locked.
+                  Actively in development. Editing and removal are locked.
                 </p>
               </div>
 
@@ -376,7 +414,7 @@ export default function TaskManager({ user, onNavigate }) {
 
                         <div className="kanban-card-footer">
                           <span className="kanban-card-status-label" style={{ color: 'var(--color-info)' }}>
-                            🔒 Work In Progress
+                            🔒 Locked — Cannot edit or remove
                           </span>
                           <div className="kanban-btn-group">
                             <button
@@ -411,7 +449,7 @@ export default function TaskManager({ user, onNavigate }) {
                   </span>
                 </div>
                 <p className="kanban-column-desc">
-                  Finished deliverables evaluated by the team lead.
+                  Finished deliverables. Editing and removal are locked.
                 </p>
               </div>
 
@@ -458,7 +496,7 @@ export default function TaskManager({ user, onNavigate }) {
 
                         <div className="kanban-card-footer">
                           <span className="kanban-card-status-label" style={{ color: 'var(--color-success)' }}>
-                            ✓ Finalized Deliverable
+                            ✓ Finalized — Cannot edit or remove
                           </span>
                         </div>
                       </div>

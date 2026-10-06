@@ -374,3 +374,15 @@
 .kanban-btn-complete:hover {
   filter: brightness(1.1);
 }
+
+.kanban-btn-delete {
+  background: transparent;
+  border-color: rgba(239, 68, 68, 0.35);
+  color: var(--color-danger, #EF4444);
+}
+
+.kanban-btn-delete:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: var(--color-danger, #EF4444);
+}
+

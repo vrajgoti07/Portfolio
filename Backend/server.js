@@ -602,10 +602,22 @@ app.delete("/tasks/:id", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Invalid Task ID format" });
     }
 
-    const deletedTask = await Task.findByIdAndDelete(id);
-    if (!deletedTask) {
+    const existingTask = await Task.findById(id);
+    if (!existingTask) {
       return res.status(404).json({ message: "Task not found" });
     }
+
+    const isAdmin = req.user?.role === "admin" || req.user?.email === "vrajgoti07@gmail.com";
+    const isOngoingOrCompleted = existingTask.status === "Ongoing" || existingTask.status === "Completed" || existingTask.status === "In Progress";
+
+    // Non-admin users cannot delete tasks once they have left Pending status
+    if (!isAdmin && isOngoingOrCompleted) {
+      return res.status(403).json({
+        message: `Deletion is locked! Tasks in ${existingTask.status} status cannot be removed. Only pending tasks can be deleted.`
+      });
+    }
+
+    const deletedTask = await Task.findByIdAndDelete(id);
 
     res.status(200).json({
       message: "Task deleted successfully",
