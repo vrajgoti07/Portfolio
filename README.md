@@ -246,8 +246,6 @@ Testing with Chrome DevTools Network Tab (`Disable cache` enabled):
 | **Task Page Chunk** | Bundled in main | 14.14 kB (3.34 kB gzip) | Loaded only when visiting `/tasks` |
 | **Scroll Event Re-renders** | Entire `App` tree on every pixel | 0 `App` re-renders (`ScrollProgress` isolated) | 60fps smooth scrolling |
 
-*For complete test environment specifications and evidence templates, refer to [docs/performance/practical-8-results.md](docs/performance/practical-8-results.md).*
-
 ---
 
 ## 9. Slow 3G Network Throttling Verification
