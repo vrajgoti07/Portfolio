@@ -3,119 +3,26 @@ import Reveal from './Reveal';
 import Spinner from './Spinner';
 import ErrorMessage from './ErrorMessage';
 import NotificationToast from './NotificationToast';
-import { getTasks, createTask, updateTask, deleteTask } from '../api';
+import { getTasks, updateTask, getUserEmail } from '../api';
 
-/* ─── Status Config ─────────────────────────────────────────── */
-const STATUS_CONFIG = {
-  Pending: {
-    bg: 'rgba(245, 158, 11, 0.12)',
-    border: 'rgba(245, 158, 11, 0.4)',
-    color: '#F59E0B',
-    dot: '#F59E0B',
-    label: 'Pending'
-  },
-  'In Progress': {
-    bg: 'rgba(0, 212, 255, 0.12)',
-    border: 'rgba(0, 212, 255, 0.4)',
-    color: '#00D4FF',
-    dot: '#00D4FF',
-    label: 'In Progress'
-  },
-  Completed: {
-    bg: 'rgba(16, 185, 129, 0.12)',
-    border: 'rgba(16, 185, 129, 0.4)',
-    color: '#10B981',
-    dot: '#10B981',
-    label: 'Completed'
-  }
-};
-
-/* ─── Icons ─────────────────────────────────────────────────── */
-const PlusIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="12" y1="5" x2="12" y2="19" />
-    <line x1="5" y1="12" x2="19" y2="12" />
-  </svg>
-);
-
-const RefreshIcon = ({ spin }) => (
-  <svg
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    style={{ animation: spin ? 'spin 0.8s linear infinite' : 'none' }}
-  >
-    <polyline points="23 4 23 10 17 10" />
-    <polyline points="1 20 1 14 7 14" />
-    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-  </svg>
-);
-
-const SearchIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="11" cy="11" r="8" />
-    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-  </svg>
-);
-
-const EditIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-  </svg>
-);
-
-const TrashIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="3 6 5 6 21 6" />
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-    <line x1="10" y1="11" x2="10" y2="17" />
-    <line x1="14" y1="11" x2="14" y2="17" />
-  </svg>
-);
-
-const CheckCircleIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-    <polyline points="22 4 12 14.01 9 11.01" />
-  </svg>
-);
-
-export default function TaskManager({ user, onLogout }) {
+export default function TaskManager({ user, onNavigate }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [notification, setNotification] = useState(null);
 
-  // Filters & Search
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('newest');
-
-  // Create form state
-  const [newTitle, setNewTitle] = useState('');
-  const [newDescription, setNewDescription] = useState('');
-  const [newStatus, setNewStatus] = useState('Pending');
-  const [creating, setCreating] = useState(false);
-
-  // Edit modal state
+  // Edit modal state (allowed strictly for Pending tasks)
   const [editingTask, setEditingTask] = useState(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
-  const [editStatus, setEditStatus] = useState('Pending');
+  const [editPriority, setEditPriority] = useState('Medium');
   const [updating, setUpdating] = useState(false);
 
-  // Delete modal state
-  const [deletingTask, setDeletingTask] = useState(null);
-  const [deleting, setDeleting] = useState(false);
+  const currentUserEmail = (user?.email || getUserEmail() || '').toLowerCase().trim();
+  const isAuthenticated = Boolean(currentUserEmail);
 
-  /* ── Show Toast Helper ───────────────────────────────────────── */
+  /* ── Toast Helper ────────────────────────────────────────────── */
   const showNotification = useCallback((type, message) => {
     setNotification({ type, message });
     setTimeout(() => {
@@ -123,24 +30,22 @@ export default function TaskManager({ user, onLogout }) {
     }, 4000);
   }, []);
 
-  /* ── Fetch Tasks from MongoDB Backend ────────────────────────── */
+  /* ── Load Tasks ──────────────────────────────────────────────── */
   const loadTasks = useCallback(async (isRefresh = false) => {
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
     setError('');
+
     try {
       const data = await getTasks();
       const taskList = Array.isArray(data) ? data : (data.tasks || []);
       setTasks(taskList);
       if (isRefresh) {
-        showNotification('success', 'Tasks synchronized from MongoDB database!');
+        showNotification('success', 'Task information refreshed.');
       }
     } catch (err) {
       console.error('Fetch tasks error:', err);
-      setError(err.message || 'Failed to fetch tasks from backend.');
+      setError(err.message || 'Failed to load task information.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -151,59 +56,22 @@ export default function TaskManager({ user, onLogout }) {
     loadTasks();
   }, [loadTasks]);
 
-  /* ── Keyboard shortcut to close modal ─────────────────────────── */
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        if (editingTask) setEditingTask(null);
-        if (deletingTask) setDeletingTask(null);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editingTask, deletingTask]);
-
-  /* ── Create Task Handler (POST /tasks) ───────────────────────── */
-  const handleCreateTask = async (e) => {
-    e.preventDefault();
-    if (!newTitle.trim()) {
-      showNotification('error', 'Task title is required.');
+  /* ── Open Edit for Pending Task ──────────────────────────────── */
+  const handleOpenEdit = (task) => {
+    const status = task.status || (task.completed ? 'Completed' : 'Pending');
+    if (status !== 'Pending' && currentUserEmail !== 'vrajgoti07@gmail.com') {
+      showNotification('error', 'Editing locked! Tasks cannot be edited once they are in Onboarding or Completed status.');
       return;
     }
 
-    setCreating(true);
-    try {
-      const response = await createTask({
-        title: newTitle.trim(),
-        description: newDescription.trim(),
-        status: newStatus
-      });
-
-      const createdTask = response.task || response;
-      setTasks((prev) => [createdTask, ...prev]);
-
-      setNewTitle('');
-      setNewDescription('');
-      setNewStatus('Pending');
-      showNotification('success', 'Task saved directly to MongoDB database!');
-    } catch (err) {
-      console.error('Create task error:', err);
-      showNotification('error', err.message || 'Failed to create task.');
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  /* ── Open Edit Modal ─────────────────────────────────────────── */
-  const handleOpenEdit = (task) => {
     setEditingTask(task);
     setEditTitle(task.title || '');
     setEditDescription(task.description || '');
-    setEditStatus(task.status || (task.completed ? 'Completed' : 'Pending'));
+    setEditPriority(task.priority || 'Medium');
   };
 
-  /* ── Update Task Handler (PUT /tasks/:id) ─────────────────────── */
-  const handleUpdateTask = async (e) => {
+  /* ── Save Edited Pending Task ────────────────────────────────── */
+  const handleSaveEdit = async (e) => {
     e.preventDefault();
     if (!editTitle.trim()) {
       showNotification('error', 'Task title cannot be empty.');
@@ -216,115 +84,70 @@ export default function TaskManager({ user, onLogout }) {
       const response = await updateTask(taskId, {
         title: editTitle.trim(),
         description: editDescription.trim(),
-        status: editStatus
+        priority: editPriority
       });
 
-      const updatedTaskObj = response.task || response;
-      setTasks((prev) =>
-        prev.map((t) => ((t._id || t.id) === taskId ? updatedTaskObj : t))
-      );
-
+      const updated = response.task || response;
+      setTasks((prev) => prev.map((t) => ((t._id || t.id) === taskId ? updated : t)));
       setEditingTask(null);
-      showNotification('success', 'Task updated in MongoDB database!');
+      showNotification('success', 'Pending task details updated successfully.');
     } catch (err) {
-      console.error('Update task error:', err);
       showNotification('error', err.message || 'Failed to update task.');
     } finally {
       setUpdating(false);
     }
   };
 
-  /* ── Quick Status Transition ─────────────────────────────────── */
-  const handleQuickStatusChange = async (task, nextStatus) => {
+  /* ── Advance Status ──────────────────────────────────────────── */
+  const handleAdvanceStatus = async (task, nextStatus) => {
+    if (!isAuthenticated) {
+      showNotification('error', 'Please sign in to update task progress.');
+      if (onNavigate) onNavigate('/login');
+      return;
+    }
+
     const taskId = task._id || task.id;
     try {
       const response = await updateTask(taskId, {
-        title: task.title,
-        description: task.description,
         status: nextStatus
       });
 
-      const updatedTaskObj = response.task || response;
-      setTasks((prev) =>
-        prev.map((t) => ((t._id || t.id) === taskId ? updatedTaskObj : t))
-      );
-
-      showNotification('success', `Task moved to "${nextStatus}"!`);
+      const updated = response.task || response;
+      setTasks((prev) => prev.map((t) => ((t._id || t.id) === taskId ? updated : t)));
+      showNotification('success', `Task moved to "${nextStatus}".`);
     } catch (err) {
-      console.error('Status change error:', err);
-      showNotification('error', err.message || 'Failed to update status.');
+      showNotification('error', err.message || 'Failed to advance status.');
     }
   };
 
-  /* ── Delete Task Handler (DELETE /tasks/:id) ─────────────────── */
-  const handleDeleteTask = async () => {
-    if (!deletingTask) return;
-    setDeleting(true);
-    const taskId = deletingTask._id || deletingTask.id;
-    try {
-      await deleteTask(taskId);
-      setTasks((prev) => prev.filter((t) => (t._id || t.id) !== taskId));
-      setDeletingTask(null);
-      showNotification('success', 'Task deleted from MongoDB database.');
-    } catch (err) {
-      console.error('Delete task error:', err);
-      showNotification('error', err.message || 'Failed to delete task.');
-    } finally {
-      setDeleting(false);
-    }
-  };
+  /* ── Group tasks by Pending, Onboarding/Ongoing, Completed ──── */
+  const pendingTasks = tasks.filter((t) => {
+    const s = t.status || (t.completed ? 'Completed' : 'Pending');
+    return s === 'Pending';
+  });
 
-  /* ── Derived Data & Filtering ────────────────────────────────── */
-  const filteredTasks = tasks
-    .filter((task) => {
-      const taskStatus = task.status || (task.completed ? 'Completed' : 'Pending');
-      if (statusFilter !== 'All' && taskStatus !== statusFilter) {
-        return false;
-      }
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchesTitle = task.title?.toLowerCase().includes(q);
-        const matchesDesc = task.description?.toLowerCase().includes(q);
-        return matchesTitle || matchesDesc;
-      }
-      return true;
-    })
-    .sort((a, b) => {
-      if (sortBy === 'newest') {
-        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
-      }
-      if (sortBy === 'oldest') {
-        return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
-      }
-      if (sortBy === 'az') {
-        return (a.title || '').localeCompare(b.title || '');
-      }
-      return 0;
-    });
+  const onboardingTasks = tasks.filter((t) => {
+    const s = t.status || (t.completed ? 'Completed' : 'Pending');
+    return s === 'Ongoing' || s === 'Onboarding' || s === 'In Progress';
+  });
 
-  // Calculate statistics
-  const statsCounts = {
-    total: tasks.length,
-    pending: tasks.filter((t) => (t.status || (t.completed ? 'Completed' : 'Pending')) === 'Pending').length,
-    inProgress: tasks.filter((t) => t.status === 'In Progress').length,
-    completed: tasks.filter((t) => (t.status || (t.completed ? 'Completed' : 'Pending')) === 'Completed').length
-  };
+  const completedTasks = tasks.filter((t) => {
+    const s = t.status || (t.completed ? 'Completed' : 'Pending');
+    return s === 'Completed';
+  });
 
   const formatDate = (isoString) => {
-    if (!isoString) return 'Just now';
-    const d = new Date(isoString);
-    return d.toLocaleDateString('en-US', {
+    if (!isoString) return 'Recently';
+    return new Date(isoString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      year: 'numeric'
     });
   };
 
   return (
-    <section id="task-manager" className="task-section">
-      <div className="container">
-        {/* Toast Notification */}
+    <section id="task-page" style={{ padding: '2rem 0 5rem 0' }}>
+      <div className="container" style={{ maxWidth: '840px', margin: '0 auto' }}>
         {notification && (
           <NotificationToast
             type={notification.type}
@@ -333,361 +156,302 @@ export default function TaskManager({ user, onLogout }) {
           />
         )}
 
-        {/* ── Header ────────────────────────────────────────────── */}
+        {/* ── Page Header ─────────────────────────────────────────── */}
         <Reveal>
-          <div className="task-header-wrap">
-            <div>
-              <div className="task-badge-meta">
-                <span className="section-tag" style={{ margin: 0 }}>Practical 7 Protected CRUD</span>
-                <span className="task-conn-badge">
-                  <span className={`task-conn-dot ${error ? 'offline' : 'online'}`} />
-                  {error ? 'MongoDB Disconnected' : 'MongoDB Atlas Connected'}
-                </span>
+          <div style={{ marginBottom: '2.5rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
                 <span
                   style={{
                     fontFamily: 'var(--font-code)',
-                    fontSize: '0.75rem',
-                    padding: '0.2rem 0.6rem',
-                    borderRadius: '100px',
-                    background: 'rgba(108, 99, 255, 0.15)',
-                    border: '1px solid rgba(108, 99, 255, 0.35)',
-                    color: 'var(--accent-secondary)'
+                    fontSize: '0.8rem',
+                    color: 'var(--accent-secondary)',
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    display: 'block',
+                    marginBottom: '0.4rem'
                   }}
                 >
-                  🔒 JWT Authenticated {user?.email ? `(${user.email})` : ''}
+                  Task Status Information
                 </span>
-              </div>
-              <h1 className="section-title" style={{ marginTop: '0.5rem', marginBottom: '0.5rem' }}>
-                Task Management System
-              </h1>
-              <p className="section-desc" style={{ maxWidth: '640px' }}>
-                Connected React frontend to Express REST backend &amp; MongoDB database.
-                Full CRUD functionality with real-time state synchronization, search, filters, and persistence.
-              </p>
-            </div>
-
-            <button
-              id="refresh-tasks-btn"
-              className="btn btn-ghost task-refresh-btn"
-              onClick={() => loadTasks(true)}
-              disabled={loading || refreshing}
-              title="Refresh from MongoDB"
-            >
-              <RefreshIcon spin={refreshing} />
-              <span>{refreshing ? 'Syncing...' : 'Refresh MongoDB'}</span>
-            </button>
-          </div>
-        </Reveal>
-
-        {/* ── Stats Summary Bar ──────────────────────────────────── */}
-        <Reveal delay={100}>
-          <div className="task-stats-bar">
-            <div className="task-stat-chip">
-              <span className="task-stat-num">{statsCounts.total}</span>
-              <span className="task-stat-lbl">Total Tasks</span>
-            </div>
-            <div className="task-stat-chip pending">
-              <span className="task-stat-num" style={{ color: STATUS_CONFIG.Pending.color }}>{statsCounts.pending}</span>
-              <span className="task-stat-lbl">Pending</span>
-            </div>
-            <div className="task-stat-chip in-progress">
-              <span className="task-stat-num" style={{ color: STATUS_CONFIG['In Progress'].color }}>{statsCounts.inProgress}</span>
-              <span className="task-stat-lbl">In Progress</span>
-            </div>
-            <div className="task-stat-chip completed">
-              <span className="task-stat-num" style={{ color: STATUS_CONFIG.Completed.color }}>{statsCounts.completed}</span>
-              <span className="task-stat-lbl">Completed</span>
-            </div>
-          </div>
-        </Reveal>
-
-        {/* ── Create Task Form Card ──────────────────────────────── */}
-        <Reveal delay={150}>
-          <div className="task-form-card">
-            <div className="task-form-header">
-              <div className="task-form-icon">
-                <PlusIcon />
-              </div>
-              <div>
-                <h3 className="task-form-title">Create New Task</h3>
-                <p className="task-form-subtitle">Save a new task directly into the MongoDB collection</p>
-              </div>
-            </div>
-
-            <form onSubmit={handleCreateTask} className="task-form">
-              <div className="task-form-grid">
-                <div className="task-form-group" style={{ flex: '1 1 60%' }}>
-                  <label htmlFor="task-title-input" className="task-label">
-                    Task Title <span style={{ color: 'var(--accent-tertiary)' }}>*</span>
-                  </label>
-                  <input
-                    id="task-title-input"
-                    type="text"
-                    className="task-input"
-                    placeholder="Enter task title (e.g. Implement JWT Authentication)..."
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="task-form-group" style={{ flex: '1 1 35%' }}>
-                  <label htmlFor="task-status-select" className="task-label">
-                    Initial Status
-                  </label>
-                  <select
-                    id="task-status-select"
-                    className="task-select"
-                    value={newStatus}
-                    onChange={(e) => setNewStatus(e.target.value)}
-                  >
-                    <option value="Pending">Pending</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Completed">Completed</option>
-                  </select>
-                </div>
+                <h1 style={{ fontSize: '2.2rem', fontWeight: 800, margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>
+                  Task Details by Stage
+                </h1>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: 0, lineHeight: 1.6 }}>
+                  Information and live details for <strong>Pending</strong>, <strong>Onboarding</strong>, and <strong>Completed</strong> tasks.
+                </p>
               </div>
 
-              <div className="task-form-group">
-                <label htmlFor="task-desc-input" className="task-label">
-                  Description <span style={{ color: 'var(--text-muted)', fontSize: '0.8em' }}>(Optional)</span>
-                </label>
-                <textarea
-                  id="task-desc-input"
-                  rows="3"
-                  className="task-textarea"
-                  placeholder="Enter detailed task requirements, notes, or execution steps..."
-                  value={newDescription}
-                  onChange={(e) => setNewDescription(e.target.value)}
-                />
-              </div>
-
-              <div className="task-form-actions">
-                <button
-                  id="add-task-btn"
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={creating}
-                >
-                  {creating ? (
-                    <>
-                      <Spinner size="sm" />
-                      <span>Saving to MongoDB...</span>
-                    </>
-                  ) : (
-                    <>
-                      <PlusIcon />
-                      <span>Add Task to MongoDB</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </Reveal>
-
-        {/* ── Controls: Search, Filter, Sort ─────────────────────── */}
-        <Reveal delay={200}>
-          <div className="task-controls-wrapper">
-            {/* Status Filter Tabs */}
-            <div className="task-filter-pills">
-              {['All', 'Pending', 'In Progress', 'Completed'].map((tab) => {
-                const isActive = statusFilter === tab;
-                return (
-                  <button
-                    key={tab}
-                    id={`filter-${tab.toLowerCase().replace(/\s+/g, '-')}`}
-                    className={`task-filter-btn ${isActive ? 'active' : ''}`}
-                    onClick={() => setStatusFilter(tab)}
-                  >
-                    {tab}
-                    <span className="task-filter-count">
-                      {tab === 'All'
-                        ? statsCounts.total
-                        : tab === 'Pending'
-                        ? statsCounts.pending
-                        : tab === 'In Progress'
-                        ? statsCounts.inProgress
-                        : statsCounts.completed}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Search and Sort */}
-            <div className="task-search-sort-wrap">
-              <div className="task-search-box">
-                <SearchIcon />
-                <input
-                  id="task-search-input"
-                  type="text"
-                  placeholder="Search tasks..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="task-search-input"
-                />
-                {searchQuery && (
-                  <button
-                    className="task-search-clear"
-                    onClick={() => setSearchQuery('')}
-                    title="Clear search"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-
-              <select
-                id="task-sort-select"
-                className="task-sort-select"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                aria-label="Sort tasks"
+              <button
+                className="btn btn-ghost"
+                onClick={() => loadTasks(true)}
+                disabled={loading || refreshing}
+                style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
               >
-                <option value="newest">Newest First</option>
-                <option value="oldest">Oldest First</option>
-                <option value="az">Title A → Z</option>
-              </select>
+                {refreshing ? 'Refreshing...' : '🔄 Refresh Details'}
+              </button>
             </div>
           </div>
         </Reveal>
 
-        {/* ── Task List Content ──────────────────────────────────── */}
         {loading ? (
           <Spinner />
         ) : error ? (
           <ErrorMessage message={error} onRetry={() => loadTasks(false)} />
-        ) : filteredTasks.length === 0 ? (
-          <Reveal>
-            <div className="task-empty-state">
-              <div className="task-empty-icon">📝</div>
-              <h3 className="task-empty-title">
-                {searchQuery || statusFilter !== 'All' ? 'No matching tasks found' : 'No tasks created yet'}
-              </h3>
-              <p className="task-empty-desc">
-                {searchQuery || statusFilter !== 'All'
-                  ? 'Try adjusting your search terms or filter selection above.'
-                  : 'Get started by creating your first task using the form above. It will be saved directly into MongoDB!'}
-              </p>
-              {(searchQuery || statusFilter !== 'All') && (
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => {
-                    setSearchQuery('');
-                    setStatusFilter('All');
-                  }}
-                >
-                  Reset Filters
-                </button>
-              )}
-            </div>
-          </Reveal>
         ) : (
-          <div className="task-cards-grid">
-            {filteredTasks.map((task, idx) => {
-              const currentStatus = task.status || (task.completed ? 'Completed' : 'Pending');
-              const statusStyle = STATUS_CONFIG[currentStatus] || STATUS_CONFIG.Pending;
-              const taskId = task._id || task.id;
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+            {/* ═══════════════════════════════════════════════════════════
+                1. PENDING TASKS SECTION
+                ═══════════════════════════════════════════════════════════ */}
+            <Reveal delay={100}>
+              <div style={{ borderLeft: '4px solid #F59E0B', paddingLeft: '1.25rem', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <h2 style={{ fontSize: '1.45rem', fontWeight: 800, margin: 0, color: '#F59E0B' }}>
+                    🟡 Pending Tasks ({pendingTasks.length})
+                  </h2>
+                </div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', margin: '0.35rem 0 0 0' }}>
+                  Tasks awaiting execution. Task details can be edited before starting work.
+                </p>
+              </div>
 
-              return (
-                <Reveal key={taskId || idx} delay={Math.min(idx * 40, 400)}>
-                  <div className={`task-card status-${currentStatus.toLowerCase().replace(/\s+/g, '-')}`}>
-                    {/* Top Row: Status Badge & Quick Actions */}
-                    <div className="task-card-header">
-                      <span
-                        className="task-status-badge"
+              {pendingTasks.length === 0 ? (
+                <div style={{ padding: '1.25rem', background: 'rgba(245, 158, 11, 0.04)', borderRadius: '8px', border: '1px dashed rgba(245, 158, 11, 0.25)', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                  No tasks currently in Pending status.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {pendingTasks.map((task) => {
+                    const taskId = task._id || task.id;
+                    return (
+                      <div
+                        key={taskId}
                         style={{
-                          background: statusStyle.bg,
-                          borderColor: statusStyle.border,
-                          color: statusStyle.color
+                          padding: '1.4rem',
+                          borderRadius: '10px',
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          border: '1px solid rgba(245, 158, 11, 0.25)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.85rem'
                         }}
                       >
-                        <span className="task-status-dot" style={{ background: statusStyle.dot }} />
-                        {currentStatus}
-                      </span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                            {task.title}
+                          </h3>
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '4px', background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B' }}>
+                              Pending • {task.priority || 'Medium'} Priority
+                            </span>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                              {formatDate(task.createdAt)}
+                            </span>
+                          </div>
+                        </div>
 
-                      <div className="task-card-actions">
-                        <button
-                          id={`edit-task-${taskId}`}
-                          className="task-icon-btn edit"
-                          onClick={() => handleOpenEdit(task)}
-                          title="Edit Task"
-                          aria-label="Edit Task"
-                        >
-                          <EditIcon />
-                        </button>
-                        <button
-                          id={`delete-task-${taskId}`}
-                          className="task-icon-btn delete"
-                          onClick={() => setDeletingTask(task)}
-                          title="Delete Task"
-                          aria-label="Delete Task"
-                        >
-                          <TrashIcon />
-                        </button>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: 1.6 }}>
+                          {task.description || <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>No description provided.</span>}
+                        </div>
+
+                        {/* Options underneath Pending Task */}
+                        <div style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            ✏️ Edit option active (Pending only)
+                          </span>
+
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button
+                              className="btn btn-ghost"
+                              style={{ padding: '0.35rem 0.75rem', fontSize: '0.82rem' }}
+                              onClick={() => handleOpenEdit(task)}
+                            >
+                              ✏️ Edit Task Details
+                            </button>
+                            <button
+                              className="btn btn-primary"
+                              style={{ padding: '0.35rem 0.85rem', fontSize: '0.82rem', background: 'linear-gradient(135deg, #00D4FF, #0284C7)' }}
+                              onClick={() => handleAdvanceStatus(task, 'Ongoing')}
+                            >
+                              ▶️ Start Onboarding / Ongoing
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Reveal>
 
-                    {/* Task Title */}
-                    <h3 className="task-card-title">{task.title}</h3>
+            {/* ═══════════════════════════════════════════════════════════
+                2. ONBOARDING / ONGOING TASKS SECTION
+                ═══════════════════════════════════════════════════════════ */}
+            <Reveal delay={150}>
+              <div style={{ borderLeft: '4px solid #00D4FF', paddingLeft: '1.25rem', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <h2 style={{ fontSize: '1.45rem', fontWeight: 800, margin: 0, color: '#00D4FF' }}>
+                    🔵 Onboarding &amp; Ongoing Tasks ({onboardingTasks.length})
+                  </h2>
+                </div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', margin: '0.35rem 0 0 0' }}>
+                  Tasks actively in progress. Content editing is locked once work has started.
+                </p>
+              </div>
 
-                    {/* Task Description */}
-                    <p className="task-card-desc">
-                      {task.description || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No description provided.</span>}
-                    </p>
+              {onboardingTasks.length === 0 ? (
+                <div style={{ padding: '1.25rem', background: 'rgba(0, 212, 255, 0.04)', borderRadius: '8px', border: '1px dashed rgba(0, 212, 255, 0.25)', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                  No tasks currently in Onboarding or Ongoing progress.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {onboardingTasks.map((task) => {
+                    const taskId = task._id || task.id;
+                    return (
+                      <div
+                        key={taskId}
+                        style={{
+                          padding: '1.4rem',
+                          borderRadius: '10px',
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          border: '1px solid rgba(0, 212, 255, 0.25)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.85rem'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                            {task.title}
+                          </h3>
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '4px', background: 'rgba(0, 212, 255, 0.15)', color: '#00D4FF' }}>
+                              Onboarding / Ongoing • {task.priority || 'Medium'} Priority
+                            </span>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                              {formatDate(task.createdAt)}
+                            </span>
+                          </div>
+                        </div>
 
-                    {/* Footer: Date & Quick Status Toggle */}
-                    <div className="task-card-footer">
-                      <span className="task-date">
-                        {formatDate(task.createdAt)}
-                      </span>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: 1.6 }}>
+                          {task.description || <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>No description provided.</span>}
+                        </div>
 
-                      {/* Quick Status Cycler */}
-                      <div className="task-quick-status">
-                        {currentStatus !== 'Completed' ? (
+                        {/* Options underneath Onboarding Task */}
+                        <div style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
+                          <span style={{ fontSize: '0.8rem', color: '#00D4FF' }}>
+                            🔒 In Progress — Editing is locked
+                          </span>
+
                           <button
-                            className="task-status-quick-btn complete"
-                            onClick={() => handleQuickStatusChange(task, 'Completed')}
-                            title="Mark as Completed"
+                            className="btn btn-primary"
+                            style={{ padding: '0.35rem 0.85rem', fontSize: '0.82rem', background: 'linear-gradient(135deg, #10B981, #059669)' }}
+                            onClick={() => handleAdvanceStatus(task, 'Completed')}
                           >
-                            <CheckCircleIcon /> Mark Done
+                            ✅ Mark as Completed
                           </button>
-                        ) : (
-                          <button
-                            className="task-status-quick-btn reopen"
-                            onClick={() => handleQuickStatusChange(task, 'Pending')}
-                            title="Reopen Task"
-                          >
-                            Reopen
-                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Reveal>
+
+            {/* ═══════════════════════════════════════════════════════════
+                3. COMPLETED TASKS SECTION
+                ═══════════════════════════════════════════════════════════ */}
+            <Reveal delay={200}>
+              <div style={{ borderLeft: '4px solid #10B981', paddingLeft: '1.25rem', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <h2 style={{ fontSize: '1.45rem', fontWeight: 800, margin: 0, color: '#10B981' }}>
+                    🟢 Completed Tasks ({completedTasks.length})
+                  </h2>
+                </div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', margin: '0.35rem 0 0 0' }}>
+                  Finished deliverables. Tasks are locked and evaluated.
+                </p>
+              </div>
+
+              {completedTasks.length === 0 ? (
+                <div style={{ padding: '1.25rem', background: 'rgba(16, 185, 129, 0.04)', borderRadius: '8px', border: '1px dashed rgba(16, 185, 129, 0.25)', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                  No tasks currently completed.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {completedTasks.map((task) => {
+                    const taskId = task._id || task.id;
+                    return (
+                      <div
+                        key={taskId}
+                        style={{
+                          padding: '1.4rem',
+                          borderRadius: '10px',
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          border: '1px solid rgba(16, 185, 129, 0.25)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.85rem'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                            {task.title}
+                          </h3>
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.15)', color: '#10B981' }}>
+                              Completed
+                            </span>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                              {formatDate(task.createdAt)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: 1.6 }}>
+                          {task.description || <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>No description provided.</span>}
+                        </div>
+
+                        {/* Evaluation verdict if available */}
+                        {task.evaluationVerdict && task.evaluationVerdict !== 'Pending Evaluation' && (
+                          <div style={{ padding: '0.65rem 0.85rem', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', fontSize: '0.82rem' }}>
+                            <strong style={{ color: '#10B981' }}>Evaluation: {task.evaluationVerdict}</strong>
+                            {task.evaluationScore && <span> • Score: {task.evaluationScore}/100</span>}
+                            {task.evaluationNotes && <div style={{ color: 'var(--text-secondary)', fontStyle: 'italic', marginTop: '0.2rem' }}>"{task.evaluationNotes}"</div>}
+                          </div>
                         )}
+
+                        {/* Options underneath Completed Task */}
+                        <div style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.8rem', color: '#10B981' }}>
+                            ✓ Deliverable finalized and locked
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </Reveal>
-              );
-            })}
+                    );
+                  })}
+                </div>
+              )}
+            </Reveal>
           </div>
         )}
       </div>
 
-      {/* ── Edit Task Modal ────────────────────────────────────── */}
+      {/* ── Edit Task Modal (Strictly for Pending Tasks) ──────────── */}
       {editingTask && (
         <div className="modal-overlay" onClick={() => setEditingTask(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 className="modal-title">Edit Task</h3>
-              <button
-                className="modal-close-btn"
-                onClick={() => setEditingTask(null)}
-                title="Close modal"
-              >
-                ×
-              </button>
+              <h3 className="modal-title">Edit Pending Task Details</h3>
+              <button className="modal-close-btn" onClick={() => setEditingTask(null)}>×</button>
             </div>
 
-            <form onSubmit={handleUpdateTask} className="modal-form">
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+              Pending task details can be modified before starting work.
+            </p>
+
+            <form onSubmit={handleSaveEdit}>
               <div className="task-form-group">
                 <label className="task-label">Task Title *</label>
                 <input
@@ -700,20 +464,21 @@ export default function TaskManager({ user, onLogout }) {
               </div>
 
               <div className="task-form-group">
-                <label className="task-label">Status</label>
+                <label className="task-label">Priority Level</label>
                 <select
                   className="task-select"
-                  value={editStatus}
-                  onChange={(e) => setEditStatus(e.target.value)}
+                  value={editPriority}
+                  onChange={(e) => setEditPriority(e.target.value)}
                 >
-                  <option value="Pending">Pending</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Completed">Completed</option>
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Urgent">Urgent</option>
                 </select>
               </div>
 
               <div className="task-form-group">
-                <label className="task-label">Description</label>
+                <label className="task-label">Description / Requirements</label>
                 <textarea
                   rows="4"
                   className="task-textarea"
@@ -736,43 +501,10 @@ export default function TaskManager({ user, onLogout }) {
                   className="btn btn-primary"
                   disabled={updating}
                 >
-                  {updating ? 'Saving to MongoDB...' : 'Update Task'}
+                  {updating ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* ── Delete Confirmation Modal ──────────────────────────── */}
-      {deletingTask && (
-        <div className="modal-overlay" onClick={() => setDeletingTask(null)}>
-          <div className="modal-content delete-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="delete-modal-icon">⚠️</div>
-            <h3 className="modal-title" style={{ textAlign: 'center' }}>Delete Task</h3>
-            <p className="delete-modal-text">
-              Are you sure you want to permanently delete <strong>"{deletingTask.title}"</strong> from MongoDB?
-              This operation cannot be undone.
-            </p>
-
-            <div className="modal-actions" style={{ justifyContent: 'center' }}>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setDeletingTask(null)}
-                disabled={deleting}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger"
-                onClick={handleDeleteTask}
-                disabled={deleting}
-              >
-                {deleting ? 'Deleting...' : 'Delete Permanently'}
-              </button>
-            </div>
           </div>
         </div>
       )}

@@ -8,6 +8,8 @@ import ContactPage from './pages/ContactPage';
 import SkillsPage from './pages/SkillsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import AdminDashboard from './pages/AdminDashboard';
 import NotFound from './pages/NotFound';
 import NotificationToast from './components/NotificationToast';
 import { getToken, removeToken, getMe } from './api';
@@ -26,7 +28,8 @@ export default function App() {
   const [token, setTokenState] = useState(() => getToken());
   const [user, setUser] = useState(() => {
     const savedEmail = localStorage.getItem('user_email');
-    return savedEmail ? { email: savedEmail } : null;
+    const savedRole = localStorage.getItem('user_role') || (savedEmail === 'vrajgoti07@gmail.com' ? 'admin' : 'user');
+    return savedEmail ? { email: savedEmail, role: savedRole } : null;
   });
   const [globalNotification, setGlobalNotification] = useState(null);
 
@@ -77,9 +80,14 @@ export default function App() {
     if (token) {
       getMe()
         .then((userData) => {
-          setUser(userData);
-          if (userData.email) {
-            localStorage.setItem('user_email', userData.email);
+          if (userData) {
+            setUser(userData);
+            if (userData.email) {
+              localStorage.setItem('user_email', userData.email);
+            }
+            if (userData.role) {
+              localStorage.setItem('user_role', userData.role);
+            }
           }
         })
         .catch((err) => {
@@ -95,7 +103,7 @@ export default function App() {
       setUser(null);
       setGlobalNotification({
         type: 'error',
-        message: 'Session expired or unauthorized. Please log in again.'
+        message: 'Session expired. Please sign in again.'
       });
       handleNavigate('/login');
     };
@@ -108,13 +116,14 @@ export default function App() {
   const handleLoginSuccess = (authData) => {
     setTokenState(authData.token);
     const email = localStorage.getItem('user_email');
+    const role = localStorage.getItem('user_role') || (email === 'vrajgoti07@gmail.com' ? 'admin' : 'user');
     if (email) {
-      setUser({ email });
+      setUser({ email, role });
     }
     // Refresh user profile
     getMe()
       .then((userData) => setUser(userData))
-      .catch(() => {});
+      .catch(() => { });
   };
 
   // Handle Logout
@@ -124,7 +133,7 @@ export default function App() {
     setUser(null);
     setGlobalNotification({
       type: 'success',
-      message: 'Logged out successfully.'
+      message: 'Signed out successfully.'
     });
     handleNavigate('/login');
   };
@@ -135,6 +144,8 @@ export default function App() {
     { label: 'Projects', path: '/projects' },
     { label: 'Contact', path: '/contact' },
   ];
+
+  const isAdmin = (user?.email || '').toLowerCase().trim() === 'vrajgoti07@gmail.com' || user?.role === 'admin';
 
   const renderContent = () => {
     const path = currentPath.replace(/\/+$/, '') || '/';
@@ -148,10 +159,12 @@ export default function App() {
         return <ProjectsPage onNavigate={handleNavigate} />;
       case '/task':
       case '/tasks':
-        if (!token) {
-          return <LoginPage onNavigate={handleNavigate} onLoginSuccess={handleLoginSuccess} />;
-        }
+        // Crucial requirement: Tasks page strictly renders task details and never redirects or shows login!
         return <TaskPage onNavigate={handleNavigate} user={user} onLogout={handleLogout} />;
+      case '/admin':
+        return <AdminDashboard onNavigate={handleNavigate} />;
+      case '/forgot-password':
+        return <ForgotPasswordPage onNavigate={handleNavigate} />;
       case '/login':
         return <LoginPage onNavigate={handleNavigate} onLoginSuccess={handleLoginSuccess} />;
       case '/register':
@@ -210,6 +223,17 @@ export default function App() {
             )}
           </button>
         ))}
+
+        {isAdmin && (
+          <button
+            className="mobile-nav-link"
+            style={{ color: '#F59E0B', fontWeight: 700 }}
+            onClick={() => handleNavigate('/admin')}
+          >
+            <span>👑 Admin Dashboard</span>
+          </button>
+        )}
+
         {token ? (
           <button
             className="mobile-nav-link"

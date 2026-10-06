@@ -28,13 +28,27 @@ export default function LoginPage({ onNavigate, onLoginSuccess }) {
     setLoading(true);
     try {
       const data = await loginUser(email, password);
-      setNotification({ type: 'success', message: 'Login successful! Redirecting to tasks...' });
+      const user = data.user || {};
+      const isAdmin = user.role === 'admin' || email.trim().toLowerCase() === 'vrajgoti07@gmail.com';
+
+      setNotification({
+        type: 'success',
+        message: isAdmin
+          ? 'Admin authentication verified! Loading Executive Dashboard...'
+          : 'Sign in successful! Redirecting to tasks...'
+      });
+
       if (onLoginSuccess) {
         onLoginSuccess(data);
       }
+
       setTimeout(() => {
-        onNavigate('/tasks');
-      }, 600);
+        if (isAdmin) {
+          onNavigate('/admin');
+        } else {
+          onNavigate('/tasks');
+        }
+      }, 700);
     } catch (err) {
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -43,7 +57,17 @@ export default function LoginPage({ onNavigate, onLoginSuccess }) {
   };
 
   return (
-    <div style={{ paddingTop: '100px', paddingBottom: '5rem', minHeight: '85vh', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+    <div
+      style={{
+        paddingTop: '100px',
+        paddingBottom: '5rem',
+        minHeight: '85vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative'
+      }}
+    >
       {notification && (
         <NotificationToast
           type={notification.type}
@@ -64,7 +88,7 @@ export default function LoginPage({ onNavigate, onLoginSuccess }) {
                 textTransform: 'uppercase'
               }}
             >
-              Practical 7 Authentication
+              Account Authentication
             </span>
             <h1
               style={{
@@ -77,10 +101,10 @@ export default function LoginPage({ onNavigate, onLoginSuccess }) {
                 WebkitTextFillColor: 'transparent'
               }}
             >
-              Welcome Back
+              Sign In
             </h1>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-              Sign in to manage your MongoDB-backed tasks securely
+              Access your assigned tasks or executive management portal
             </p>
           </div>
         </Reveal>
@@ -102,7 +126,7 @@ export default function LoginPage({ onNavigate, onLoginSuccess }) {
                   id="login-email"
                   type="email"
                   className="task-input"
-                  placeholder="student@example.com"
+                  placeholder="Enter email address..."
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
@@ -111,17 +135,35 @@ export default function LoginPage({ onNavigate, onLoginSuccess }) {
               </div>
 
               <div className="task-form-group">
-                <label htmlFor="login-password" className="task-label">
-                  Password <span style={{ color: 'var(--accent-tertiary)' }}>*</span>
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label htmlFor="login-password" className="task-label" style={{ margin: 0 }}>
+                    Password <span style={{ color: 'var(--accent-tertiary)' }}>*</span>
+                  </label>
+                  <button
+                    type="button"
+                    id="forgot-password-link"
+                    onClick={() => onNavigate('/forgot-password')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--accent-secondary)',
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
                 <input
                   id="login-password"
                   type="password"
                   className="task-input"
-                  placeholder="Enter your password..."
+                  placeholder="Enter password..."
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
+                  style={{ marginTop: '0.4rem' }}
                   required
                 />
               </div>

@@ -28,6 +28,9 @@ export default function Navbar({
     return () => window.removeEventListener('scroll', handle);
   }, []);
 
+  const userEmail = (user?.email || '').toLowerCase().trim();
+  const isAdmin = userEmail === 'vrajgoti07@gmail.com' || user?.role === 'admin';
+
   const isItemActive = (item) => {
     if (item.path === '/') {
       return currentPath === '/' || currentPath === '/home' || currentPath === '/index.html' || currentPath === '';
@@ -65,6 +68,27 @@ export default function Navbar({
             </li>
           );
         })}
+
+        {/* Exclusive Admin Navigation Link */}
+        {isAdmin && (
+          <li>
+            <button
+              id="nav-admin-dashboard"
+              className={`nav-link ${currentPath === '/admin' ? 'active' : ''}`}
+              onClick={() => onNavigate('/admin')}
+              style={{
+                background: currentPath === '/admin' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.1)',
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+                color: '#F59E0B',
+                borderRadius: '8px',
+                padding: '0.35rem 0.75rem',
+                fontWeight: 700
+              }}
+            >
+              👑 Admin
+            </button>
+          </li>
+        )}
       </ul>
 
       {/* Auth Actions & Theme Toggle */}
@@ -78,9 +102,9 @@ export default function Navbar({
                 fontSize: '0.75rem',
                 padding: '0.35rem 0.75rem',
                 borderRadius: '100px',
-                background: 'rgba(108, 99, 255, 0.15)',
-                border: '1px solid rgba(108, 99, 255, 0.35)',
-                color: 'var(--accent-secondary)',
+                background: isAdmin ? 'rgba(245, 158, 11, 0.15)' : 'rgba(108, 99, 255, 0.15)',
+                border: isAdmin ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid rgba(108, 99, 255, 0.35)',
+                color: isAdmin ? '#F59E0B' : 'var(--accent-secondary)',
                 maxWidth: '180px',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
@@ -88,7 +112,7 @@ export default function Navbar({
               }}
               title={user?.email || 'Authenticated User'}
             >
-              {user?.email || 'Logged In'}
+              {isAdmin ? `👑 ${user?.email}` : (user?.email || 'Logged In')}
             </span>
             <button
               id="logout-btn"

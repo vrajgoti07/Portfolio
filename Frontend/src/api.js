@@ -19,11 +19,36 @@ export function setToken(token) {
 }
 
 /**
- * Helper to remove token (Logout).
+ * Helper to get user email from localStorage.
+ */
+export function getUserEmail() {
+  return localStorage.getItem("user_email") || "";
+}
+
+/**
+ * Helper to get user role from localStorage.
+ */
+export function getUserRole() {
+  return localStorage.getItem("user_role") || "user";
+}
+
+/**
+ * Helper to check if current logged in user is admin.
+ */
+export function isAdminUser() {
+  const email = (getUserEmail() || "").toLowerCase().trim();
+  const role = getUserRole();
+  return email === "vrajgoti07@gmail.com" || role === "admin";
+}
+
+/**
+ * Helper to remove token and user details (Logout).
  */
 export function removeToken() {
   localStorage.removeItem("token");
   localStorage.removeItem("user_email");
+  localStorage.removeItem("user_role");
+  localStorage.removeItem("user_name");
 }
 
 /**
@@ -45,11 +70,12 @@ function getHeaders(includeAuth = true) {
 /**
  * Generic response handler with 401 automatic token cleanup.
  */
-async function handleResponse(response, customErrorMessage) {
+async function handleResponse(response, customErrorMessage, suppressUnauthorized = false) {
   if (response.status === 401) {
-    removeToken();
-    // Dispatch custom event for 401 handling across the UI
-    window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+    if (!suppressUnauthorized) {
+      removeToken();
+      window.dispatchEvent(new CustomEvent("auth:unauthorized"));
+    }
     const errorData = await response.json().catch(() => ({}));
     const err = new Error(errorData.message || "Session expired or unauthorized. Please login again.");
     err.status = 401;
@@ -70,17 +96,17 @@ async function handleResponse(response, customErrorMessage) {
  * User Registration API
  * POST /register
  */
-export async function registerUser(email, password) {
+export async function registerUser(email, password, name = "") {
   try {
     const response = await fetch(`${BASE_URL}/register`, {
       method: "POST",
       headers: getHeaders(false),
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password, name })
     });
     return await handleResponse(response, "Registration failed");
   } catch (error) {
     if (error.name === "TypeError" && error.message.includes("fetch")) {
-      throw new Error("Unable to connect to the backend server. Please make sure backend is running on port 5000.");
+      throw new Error("Unable to connect to backend server. Please make sure backend is running on port 5000.");
     }
     throw error;
   }
@@ -100,66 +126,35 @@ export async function loginUser(email, password) {
     const data = await handleResponse(response, "Login failed");
     if (data.token) {
       setToken(data.token);
-      localStorage.setItem("user_email", email.trim().toLowerCase());
+      const user = data.user || {};
+      const normalizedEmail = (user.email || email).trim().toLowerCase();
+      localStorage.setItem("user_email", normalizedEmail);
+      localStorage.setItem("user_role", user.role || (normalizedEmail === "vrajgoti07@gmail.com" ? "admin" : "user"));
+      if (user.name) {
+        localStorage.setItem("user_name", user.name);
+      }
     }
     return data;
   } catch (error) {
     if (error.name === "TypeError" && error.message.includes("fetch")) {
-      throw new Error("Unable to connect to the backend server. Please make sure backend is running on port 5000.");
+      throw new Error("Unable to connect to backend server. Please make sure backend is running on port 5000.");
     }
     throw error;
   }
 }
 
 /**
- * Fetch Current Authenticated User
- * GET /me
+ * Forgot Password API
+ * POST /forgot-password
  */
-export async function getMe() {
+export async function forgotPassword(email, newPassword) {
   try {
-    const response = await fetch(`${BASE_URL}/me`, {
-      method: "GET",
-      headers: getHeaders(true)
+    const response = await fetch(`${BASE_URL}/forgot-password`, {
+      method: "POST",
+      headers: getHeaders(false),
+      body: JSON.stringify({ email, newPassword })
     });
-    return await handleResponse(response, "Failed to fetch user profile");
-  } catch (error) {
-    if (error.name === "TypeError" && error.message.includes("fetch")) {
-      throw new Error("Unable to connect to the backend server.");
-    }
-    throw error;
-  }
-}
-
-/**
- * Fetch all tasks from the backend API.
- * GET /tasks (Protected)
- */
-export async function getTasks() {
-  try {
-    const response = await fetch(`${BASE_URL}/tasks`, {
-      method: "GET",
-      headers: getHeaders(true)
-    });
-    return await handleResponse(response, "Failed to fetch tasks");
-  } catch (error) {
-    if (error.name === "TypeError" && error.message.includes("fetch")) {
-      throw new Error("Unable to connect to the backend server. Please make sure the backend is running at http://localhost:5000");
-    }
-    throw error;
-  }
-}
-
-/**
- * Fetch a single task by ID from the backend API.
- * GET /tasks/:id (Protected)
- */
-export async function getTaskById(id) {
-  try {
-    const response = await fetch(`${BASE_URL}/tasks/${id}`, {
-      method: "GET",
-      headers: getHeaders(true)
-    });
-    return await handleResponse(response, "Failed to fetch task");
+    return await handleResponse(response, "Password reset failed");
   } catch (error) {
     if (error.name === "TypeError" && error.message.includes("fetch")) {
       throw new Error("Unable to connect to backend server.");
@@ -169,8 +164,77 @@ export async function getTaskById(id) {
 }
 
 /**
- * Create a new task via the backend API.
- * POST /tasks (Protected & Validated)
+ * Fetch Current Authenticated User Profile
+ * GET /me
+ */
+export async function getMe() {
+  try {
+    const response = await fetch(`${BASE_URL}/me`, {
+      method: "GET",
+      headers: getHeaders(true)
+    });
+    const userData = await handleResponse(response, "Failed to fetch user profile");
+    if (userData) {
+      if (userData.email) localStorage.setItem("user_email", userData.email);
+      if (userData.role) localStorage.setItem("user_role", userData.role);
+      if (userData.name) localStorage.setItem("user_name", userData.name);
+    }
+    return userData;
+  } catch (error) {
+    if (error.name === "TypeError" && error.message.includes("fetch")) {
+      throw new Error("Unable to connect to backend server.");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Fetch Tasks from backend (public or authenticated)
+ * GET /tasks
+ */
+export async function getTasks(queryParams = {}) {
+  try {
+    const params = new URLSearchParams();
+    if (queryParams.assignedTo) params.append("assignedTo", queryParams.assignedTo);
+    if (queryParams.status && queryParams.status !== "All") params.append("status", queryParams.status);
+
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    const response = await fetch(`${BASE_URL}/tasks${qs}`, {
+      method: "GET",
+      headers: getHeaders(true)
+    });
+    // Suppress automatic unauthorized redirect on task reads so guests can browse
+    return await handleResponse(response, "Failed to fetch tasks", true);
+  } catch (error) {
+    if (error.name === "TypeError" && error.message.includes("fetch")) {
+      throw new Error("Unable to connect to backend server on port 5000.");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Fetch Single Task by ID
+ * GET /tasks/:id
+ */
+export async function getTaskById(id) {
+  try {
+    const response = await fetch(`${BASE_URL}/tasks/${id}`, {
+      method: "GET",
+      headers: getHeaders(true)
+    });
+    return await handleResponse(response, "Failed to fetch task", true);
+  } catch (error) {
+    if (error.name === "TypeError" && error.message.includes("fetch")) {
+      throw new Error("Unable to connect to backend server.");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Create Task (User or Admin)
+ * POST /tasks
  */
 export async function createTask(taskData) {
   try {
@@ -189,8 +253,8 @@ export async function createTask(taskData) {
 }
 
 /**
- * Update an existing task via the backend API.
- * PUT /tasks/:id (Protected & Validated)
+ * Update Task (Allows status change; blocks content edit if Ongoing/Completed)
+ * PUT /tasks/:id
  */
 export async function updateTask(id, taskData) {
   try {
@@ -209,8 +273,8 @@ export async function updateTask(id, taskData) {
 }
 
 /**
- * Delete a task via the backend API.
- * DELETE /tasks/:id (Protected)
+ * Delete Task
+ * DELETE /tasks/:id
  */
 export async function deleteTask(id) {
   try {
@@ -219,6 +283,65 @@ export async function deleteTask(id) {
       headers: getHeaders(true)
     });
     return await handleResponse(response, "Failed to delete task");
+  } catch (error) {
+    if (error.name === "TypeError" && error.message.includes("fetch")) {
+      throw new Error("Unable to connect to backend server.");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Admin: Fetch Users List & Workload
+ * GET /admin/users
+ */
+export async function getAdminUsers() {
+  try {
+    const response = await fetch(`${BASE_URL}/admin/users`, {
+      method: "GET",
+      headers: getHeaders(true)
+    });
+    return await handleResponse(response, "Failed to fetch team users for admin");
+  } catch (error) {
+    if (error.name === "TypeError" && error.message.includes("fetch")) {
+      throw new Error("Unable to connect to backend server.");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Admin: Assign Task to a Team Member
+ * POST /admin/tasks
+ */
+export async function assignAdminTask(taskData) {
+  try {
+    const response = await fetch(`${BASE_URL}/admin/tasks`, {
+      method: "POST",
+      headers: getHeaders(true),
+      body: JSON.stringify(taskData)
+    });
+    return await handleResponse(response, "Failed to assign task");
+  } catch (error) {
+    if (error.name === "TypeError" && error.message.includes("fetch")) {
+      throw new Error("Unable to connect to backend server.");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Admin: Evaluate Task Deliverable
+ * PUT /admin/tasks/:id/evaluate
+ */
+export async function evaluateAdminTask(taskId, evaluationData) {
+  try {
+    const response = await fetch(`${BASE_URL}/admin/tasks/${taskId}/evaluate`, {
+      method: "PUT",
+      headers: getHeaders(true),
+      body: JSON.stringify(evaluationData)
+    });
+    return await handleResponse(response, "Failed to submit evaluation");
   } catch (error) {
     if (error.name === "TypeError" && error.message.includes("fetch")) {
       throw new Error("Unable to connect to backend server.");

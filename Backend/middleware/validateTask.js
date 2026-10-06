@@ -1,3 +1,5 @@
+const ALLOWED_STATUSES = ["Pending", "Ongoing", "Completed", "In Progress"];
+
 const validateTask = (req, res, next) => {
   if (req.method === "POST") {
     const { title, status } = req.body;
@@ -8,9 +10,9 @@ const validateTask = (req, res, next) => {
       });
     }
 
-    if (status !== undefined && !["Pending", "In Progress", "Completed"].includes(status)) {
+    if (status !== undefined && !ALLOWED_STATUSES.includes(status)) {
       return res.status(400).json({
-        message: "Invalid status. Must be Pending, In Progress, or Completed"
+        message: `Invalid status. Must be one of: ${ALLOWED_STATUSES.join(", ")}`
       });
     }
   }
@@ -24,9 +26,9 @@ const validateTask = (req, res, next) => {
       });
     }
 
-    if (status !== undefined && !["Pending", "In Progress", "Completed"].includes(status)) {
+    if (status !== undefined && !ALLOWED_STATUSES.includes(status)) {
       return res.status(400).json({
-        message: "Invalid status. Must be Pending, In Progress, or Completed"
+        message: `Invalid status. Must be one of: ${ALLOWED_STATUSES.join(", ")}`
       });
     }
   }
@@ -35,3 +37,4 @@ const validateTask = (req, res, next) => {
 };
 
 module.exports = validateTask;
+
