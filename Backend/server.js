@@ -12,6 +12,7 @@ const optionalAuth = require("./middleware/optionalAuth");
 const adminMiddleware = require("./middleware/adminMiddleware");
 const validateTask = require("./middleware/validateTask");
 const emailService = require("./services/emailService");
+const taskCache = require("./config/cache");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -114,6 +115,17 @@ app.get("/smtp/status", async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ==========================================
+// Cache Debug & Statistics Route (Practical 9)
+// ==========================================
+app.get("/debug/cache", (req, res) => {
+  res.status(200).json({
+    status: "success",
+    message: "Cache statistics retrieved successfully",
+    cache: taskCache.getStats()
+  });
 });
 
 // ==========================================
@@ -379,6 +391,9 @@ app.post("/admin/tasks", authMiddleware, adminMiddleware, async (req, res) => {
 
     const savedTask = await newTask.save();
 
+    // Cache Invalidation (Practical 9): Invalidate task collections after DB write
+    taskCache.invalidateAllTasks();
+
     // Trigger SMTP Notification Email to Assignee
     emailService.sendTaskAssignmentEmail(assignedEmail, savedTask).catch((err) => {
       console.error("[SMTP NOTICE] Assignment email dispatch error:", err.message);
@@ -424,6 +439,9 @@ app.put("/admin/tasks/:id/evaluate", authMiddleware, adminMiddleware, async (req
 
     await task.save();
 
+    // Cache Invalidation (Practical 9): Invalidate single task and task collections
+    taskCache.invalidateTask(id);
+
     // Trigger SMTP Notification Email to Assignee if assigned
     if (task.assignedTo) {
       emailService.sendTaskEvaluationEmail(task.assignedTo, task).catch((err) => {
@@ -447,10 +465,30 @@ app.put("/admin/tasks/:id/evaluate", authMiddleware, adminMiddleware, async (req
 // General Task Routes (Public Read, Protected Write)
 // ==========================================
 
-// GET /tasks - Get All Tasks (Public read with optionalAuth to prevent 401s on page visit)
+// GET /tasks - Get All Tasks (Cached via node-cache)
 app.get("/tasks", optionalAuth, async (req, res) => {
   try {
     const { assignedTo, status } = req.query;
+
+    // Construct consistent cache key based on query parameters
+    let cacheKey = "all_tasks";
+    const queryParts = [];
+    if (assignedTo) queryParts.push(`assignedTo=${assignedTo.trim().toLowerCase()}`);
+    if (status && status !== "All") queryParts.push(`status=${status}`);
+    if (queryParts.length > 0) {
+      cacheKey = `all_tasks?${queryParts.join("&")}`;
+    }
+
+    // Step 1: Check in-memory cache
+    const cachedTasks = taskCache.get(cacheKey);
+    if (cachedTasks !== undefined) {
+      // CACHE HIT: Return cached data without querying MongoDB
+      res.setHeader("X-Cache", "HIT");
+      return res.status(200).json(cachedTasks);
+    }
+
+    // Step 2: CACHE MISS: Query MongoDB
+    res.setHeader("X-Cache", "MISS");
     const filter = {};
 
     if (assignedTo) {
@@ -465,7 +503,11 @@ app.get("/tasks", optionalAuth, async (req, res) => {
     }
 
     const tasks = await Task.find(filter).sort({ createdAt: -1 });
-    res.status(200).json(tasks);
+
+    // Step 3: Store result in cache (even if empty, preserving valid empty states)
+    taskCache.set(cacheKey, tasks);
+
+    return res.status(200).json(tasks);
   } catch (error) {
     res.status(500).json({
       message: "Failed to fetch tasks",
@@ -474,7 +516,7 @@ app.get("/tasks", optionalAuth, async (req, res) => {
   }
 });
 
-// GET /tasks/:id - Get Single Task
+// GET /tasks/:id - Get Single Task (Cached via node-cache)
 app.get("/tasks/:id", optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
@@ -483,12 +525,28 @@ app.get("/tasks/:id", optionalAuth, async (req, res) => {
       return res.status(400).json({ message: "Invalid Task ID format" });
     }
 
+    const cacheKey = `task_${id}`;
+
+    // Step 1: Check in-memory cache
+    const cachedTask = taskCache.get(cacheKey);
+    if (cachedTask !== undefined) {
+      // CACHE HIT: Return cached task
+      res.setHeader("X-Cache", "HIT");
+      return res.status(200).json(cachedTask);
+    }
+
+    // Step 2: CACHE MISS: Query MongoDB
+    res.setHeader("X-Cache", "MISS");
     const task = await Task.findById(id);
     if (!task) {
+      // Do NOT cache 404 not-found errors
       return res.status(404).json({ message: "Task not found" });
     }
 
-    res.status(200).json(task);
+    // Step 3: Cache the single task document
+    taskCache.set(cacheKey, task);
+
+    return res.status(200).json(task);
   } catch (error) {
     res.status(500).json({
       message: "Failed to fetch task",
@@ -517,6 +575,9 @@ app.post("/tasks", authMiddleware, validateTask, async (req, res) => {
     });
 
     const savedTask = await newTask.save();
+
+    // Cache Invalidation (Practical 9): Invalidate task collections after DB write
+    taskCache.invalidateAllTasks();
 
     res.status(201).json({
       message: "Task created successfully",
@@ -581,6 +642,9 @@ app.put("/tasks/:id", authMiddleware, validateTask, async (req, res) => {
 
     const updatedTask = await existingTask.save();
 
+    // Cache Invalidation (Practical 9): Invalidate single task and task collections
+    taskCache.invalidateTask(id);
+
     res.status(200).json({
       message: "Task updated successfully",
       task: updatedTask
@@ -618,6 +682,9 @@ app.delete("/tasks/:id", authMiddleware, async (req, res) => {
     }
 
     const deletedTask = await Task.findByIdAndDelete(id);
+
+    // Cache Invalidation (Practical 9): Invalidate single task and task collections
+    taskCache.invalidateTask(id);
 
     res.status(200).json({
       message: "Task deleted successfully",

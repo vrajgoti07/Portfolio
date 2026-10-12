@@ -274,3 +274,34 @@ Using the React DevTools Profiler, an unnecessary re-render bottleneck was ident
 2. **Context-Driven Splitting:** Heavy administrative interfaces and modal-heavy components should never be bundled into public-facing portfolio landing code.
 3. **Suspense Boundary Placement:** Placing Suspense around the page content area while keeping the layout frame (Navbar/Footer) static provides a seamless SPA experience with zero layout shift.
 4. **State Localization:** Hoisting UI-only state (such as scroll percentages) to the root component can quietly degrade application render performance across the entire component tree. Leaf component isolation restores peak 60fps fidelity.
+
+---
+
+# Practical 9 — In-Memory Caching and Query Optimization
+
+## 1. Objective
+Implement server-side in-memory caching using `node-cache` in the Task Management Express/MongoDB REST API, optimize read latency for repeated `GET /tasks` queries, ensure deterministic cache invalidation upon database write operations, and benchmark response times.
+
+## 2. Key Architecture & Features
+- **In-Memory Cache Engine:** `node-cache` (60s default TTL, 120s check period) wrapped inside `Backend/config/cache.js`.
+- **Cached Read Endpoints:**
+  - `GET /tasks`: Checks `all_tasks` (or query-specific keys); returns cached array with `X-Cache: HIT` on repeated hits, queries MongoDB on `MISS`.
+  - `GET /tasks/:id`: Checks `task_<taskId>`; returns cached document with `X-Cache: HIT`, queries MongoDB on `MISS`.
+- **Automated Cache Invalidation:**
+  - `POST /tasks` & `POST /admin/tasks`: Flushes all `all_tasks*` collection cache keys after database save.
+  - `PUT /tasks/:id` & `PUT /admin/tasks/:id/evaluate`: Flushes both `task_<id>` and all `all_tasks*` keys.
+  - `DELETE /tasks/:id`: Flushes both `task_<id>` and all `all_tasks*` keys.
+- **Cache Observability & Diagnostics:**
+  - `GET /debug/cache`: Reports real-time hits, misses, hit ratio, total requests, active keys, and memory metrics.
+  - Custom HTTP header `X-Cache: HIT` / `X-Cache: MISS` injected into API responses for client transparency.
+
+## 3. Measured Performance Comparison
+
+| Metric | Uncached Baseline | Cached (Practical 9) | Delta / Speedup |
+| :--- | :--- | :--- | :--- |
+| **Reading 1** | 38.43 ms | 5.83 ms | **-32.60 ms (-84.8%)** |
+| **Reading 2** | 9.93 ms | 4.75 ms | **-5.18 ms (-52.2%)** |
+| **Reading 3** | 9.25 ms | 4.70 ms | **-4.55 ms (-49.2%)** |
+| **Average Response Time** | **19.20 ms** | **5.09 ms** | **14.11 ms faster (73.49% overall speedup)** |
+
+*Detailed benchmark logs and viva answers available in `docs/practical-9-performance.md`.*
