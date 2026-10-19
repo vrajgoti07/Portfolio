@@ -9,7 +9,9 @@ const authMiddleware = (req, res, next) => {
     });
   }
 
-  const token = authHeader.split(" ")[1];
+  // Strip 'Bearer ' prefix, trim extra whitespace, and handle comma-separated duplicate headers from Thunder Client (Auth tab + Headers tab)
+  const rawToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+  const token = rawToken.split(",")[0].trim().replace(/^["']|["']$/g, "");
 
   if (!token) {
     return res.status(401).json({
@@ -17,8 +19,10 @@ const authMiddleware = (req, res, next) => {
     });
   }
 
+  const jwtSecret = process.env.JWT_SECRET || "default_secret_key";
+
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, jwtSecret);
     req.user = decoded;
     next();
   } catch (error) {

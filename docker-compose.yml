@@ -1,0 +1,79 @@
+services:
+  # ========================================================
+  # Database Service: MongoDB
+  # ========================================================
+  mongodb:
+    image: mongo:7.0
+    container_name: awdf-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=awdf_db
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ========================================================
+  # Backend Service: Node.js / Express REST API
+  # ========================================================
+  backend:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: awdf-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - MONGO_URI=mongodb://mongodb:27017/awdf_db
+      - JWT_SECRET=awdf_practical11_jwt_secret_key_secure_2026_super_key
+      - NODE_ENV=production
+      - SMTP_SECURE=false
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  # ========================================================
+  # Frontend Service: React (Vite) + Nginx SPA
+  # ========================================================
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:5000
+    container_name: awdf-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+# ========================================================
+# Networks: Isolated Bridge Network for Inter-Container Comms
+# ========================================================
+networks:
+  app-network:
+    name: app-network
+    driver: bridge
+
+# ========================================================
+# Volumes: Named Volume for Persistent MongoDB Storage
+# ========================================================
+volumes:
+  mongodb_data:
+    name: mongodb_data
+    driver: local

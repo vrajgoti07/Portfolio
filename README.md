@@ -332,3 +332,31 @@ Implement asynchronous background notification processing using Node.js's native
 
 *Complete documentation, Thunder Client guide, and theory questions available in `docs/practical-10-eda.md`.*
 
+---
+
+# Practical 11 — Containerization with Docker and Docker Compose
+
+## 1. Objective
+Containerize the complete full-stack Task Management application (React Vite Frontend, Node.js Express Backend, and MongoDB Database) and orchestrate all three services seamlessly using Docker Compose with zero-loss data persistence.
+
+## 2. Containerized Architecture
+- **Frontend Service (`awdf-frontend`):** Multi-stage Dockerfile (`node:20-alpine` builder + `nginx:alpine` runtime) serving the React SPA with HTML5 client routing on `http://localhost:5173`.
+- **Backend Service (`awdf-backend`):** Production Node.js 20 container exposing Express REST APIs on `http://localhost:5000` with automated MongoDB retry backoff and health monitoring.
+- **Database Service (`awdf-mongodb`):** Official `mongo:7.0` image on `localhost:27017` with persistent named volume (`mongodb_data`) mounting `/data/db`.
+- **Isolated Network (`app-network`):** Custom bridge network facilitating secure internal inter-container communication.
+
+## 3. Quick Start (Single Command)
+```bash
+# Validate Compose definition
+docker compose config
+
+# Build and start all services
+docker compose up --build
+
+# Verify running container status
+docker compose ps
+```
+
+*Complete architecture breakdown, multi-stage Dockerfile explanations, and viva theory questions available in `docs/practical-11-docker.md`.*
+
+
