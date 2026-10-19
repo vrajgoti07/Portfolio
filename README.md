@@ -305,3 +305,30 @@ Implement server-side in-memory caching using `node-cache` in the Task Managemen
 | **Average Response Time** | **19.20 ms** | **5.09 ms** | **14.11 ms faster (73.49% overall speedup)** |
 
 *Detailed benchmark logs and viva answers available in `docs/practical-9-performance.md`.*
+
+---
+
+# Practical 10 — Asynchronous Processing with Event-Driven Architecture
+
+## 1. Objective
+Implement asynchronous background notification processing using Node.js's native `EventEmitter` without external dependencies. Decouple notification delivery from the client-facing HTTP request/response cycle using `setImmediate()`.
+
+## 2. Key Components
+- **Native Event Emitter:** `Backend/events.js` exports a shared `TaskEvents` singleton extending Node.js's built-in `EventEmitter`.
+- **Domain Listeners (`Backend/listeners.js`):**
+  - `task-created`: Emitted when a task is created. Simulates a 2-second asynchronous processing delay and logs formatted ISO timestamps (`Notification Scheduled`, `Handler Started`, `Handler Completed`).
+  - `task-deleted`: Emitted when a task is successfully deleted. Logs deleted task ID and timestamp.
+  - `notification-error`: Traps background notification failures safely without crashing the server.
+- **Decoupled API Integration (`Backend/server.js`):**
+  - `POST /tasks`: Saves task, returns HTTP 201 immediately (sub-10ms), and schedules event processing using `setImmediate()`.
+  - `DELETE /tasks/:id`: Deletes task, returns HTTP 200 immediately, and schedules `task-deleted` event using `setImmediate()`.
+
+## 3. Verified Execution & Timestamp Proof
+| Phase | Timestamp | Elapsed |
+| :--- | :--- | :--- |
+| **API Response Sent** | `2026-10-19T08:14:58.853Z` | ~8 ms roundtrip |
+| **Handler Started** | `2026-10-19T08:14:58.854Z` | Next tick (Check phase) |
+| **Handler Completed** | `2026-10-19T08:15:00.856Z` | ~2002 ms background duration |
+
+*Complete documentation, Thunder Client guide, and theory questions available in `docs/practical-10-eda.md`.*
+
