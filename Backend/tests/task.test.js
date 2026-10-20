@@ -63,8 +63,7 @@ describe("Task Management API Automated Test Suite", () => {
         .set("Authorization", `Bearer ${validToken}`)
         .send(invalidPayload);
 
-      // Deliberately incorrect expectation for Practical 12 failure demonstration
-      expect(response.statusCode).toBe(200);
+      expect(response.statusCode).toBe(400);
       expect(response.body).toHaveProperty("message");
       expect(response.body.message).toBe("Title is required");
     });
