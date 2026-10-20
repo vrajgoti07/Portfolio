@@ -1,5 +1,7 @@
 # AWDF Practical 7: Authentication and Middleware Pipeline
 
+[![CI Pipeline](https://github.com/vrajgoti07/Portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/vrajgoti07/Portfolio/actions/workflows/ci.yml)
+
 A modern full-stack Task Management application built with **React (Vite)** on the frontend, **Express.js** REST API on the backend, **MongoDB Atlas** for persistence, and **JWT + bcryptjs** for secure authentication and middleware pipeline validation.
 
 ---
@@ -358,5 +360,54 @@ docker compose ps
 ```
 
 *Complete architecture breakdown, multi-stage Dockerfile explanations, and viva theory questions available in `docs/practical-11-docker.md`.*
+
+---
+
+# Practical 12 — CI/CD Pipeline with GitHub Actions
+
+[![CI Pipeline](https://github.com/vrajgoti07/Portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/vrajgoti07/Portfolio/actions/workflows/ci.yml)
+
+## 1. Objective
+Establish an automated Continuous Integration (CI) pipeline using GitHub Actions for the Task Management application. The pipeline triggers on pushes and pull requests to `main`, provisions an isolated Ubuntu test runner, installs production and development dependencies, runs ESLint code quality checks, and executes automated Jest/Supertest backend tests to report clear pass/fail feedback on every commit.
+
+## 2. Key Components & Implementation
+- **Decoupled Architecture (`Backend/app.js` & `Backend/server.js`):**
+  - `Backend/app.js`: Encapsulates Express application initialization, global middlewares (CORS, JSON parser), and all route handlers. Exports the Express `app` without binding network ports or requiring live external MongoDB connections.
+  - `Backend/server.js`: Handles live database connection logic with resilient retry and starts the HTTP listener on `PORT`. Guarantees 100% backward compatibility for production startup (`npm start`, Docker, and local development).
+- **Automated Testing Suite (`Backend/tests/task.test.js`):**
+  - **Task Retrieval & Cache Validation (`GET /tasks`):** Validates HTTP 200 response, JSON array schema, and `X-Cache` diagnostic headers (`MISS` on cold cache, `HIT` on cached requests) for both unauthenticated and authenticated calls.
+  - **Request Body Validation (`POST /tasks`):** Validates that requests with missing titles or whitespace-only titles return HTTP 400 Bad Request with `{ message: "Title is required" }`.
+  - **Status Integrity Validation (`POST /tasks`):** Confirms that invalid task statuses trigger HTTP 400 validation errors.
+  - **Security & Authorization (`POST /tasks`):** Verifies that requests lacking a valid `Authorization: Bearer <token>` header are rejected with HTTP 401 Unauthorized.
+- **Workflow Pipeline (`.github/workflows/ci.yml`):**
+  - **Trigger Conditions:** Direct pushes to `main` and demonstration branch `practical12-demo-failure`, and pull requests targeting `main`.
+  - **Runner Environment:** `ubuntu-latest` with Node.js 20.
+  - **Job 1 (`lint`):** Validates code syntax and quality with ESLint in `Backend/`.
+  - **Job 2 (`build-and-test`):** Depends on `lint` (`needs: lint`), performs deterministic dependency installation via `npm ci`, and runs `npm test`.
+
+## 3. Workflow Triggers: Push vs. Pull Request
+- **Push Trigger (`on: push`):** Triggers the workflow immediately when code is pushed directly to the specified branches (`main`, `practical12-demo-failure`). This ensures every commit in branch history is automatically validated.
+- **Pull Request Trigger (`on: pull_request`):** Triggers against a temporary merge commit between the head branch and the target base branch (`main`). This prevents broken code from being merged into production before review and green verification.
+
+## 4. Local Execution & Test Reproduction
+Run the following commands from the `Backend` directory:
+```bash
+# 1. Install dependencies
+npm ci
+
+# 2. Run ESLint code quality check
+npm run lint
+
+# 3. Execute Jest automated test suite
+npm test
+```
+
+## 5. Inspecting GitHub Actions Runs
+1. Navigate to the GitHub repository: `https://github.com/vrajgoti07/Portfolio`.
+2. Click the **Actions** tab on the top navigation bar.
+3. Select **CI Pipeline** from the left-hand workflows sidebar.
+4. Click on any workflow run:
+   - **Passing Runs (Green Checkmark):** Expand the `build-and-test` job, click `Run automated test suite` to view the 7 passing Jest test cases.
+   - **Failing Runs (Red Cross):** Expand the failed job, locate the red step, and inspect detailed assertion diffs and stack traces.
 
 
