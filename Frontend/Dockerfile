@@ -1,7 +1,7 @@
 # ==========================================
 # Stage 1: Build Stage (Node.js)
 # ==========================================
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -9,7 +9,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install all dependencies (including devDependencies required for Vite build)
-RUN npm ci
+RUN npm install
 
 # Pass browser-accessible API base URL as build argument
 ARG VITE_API_URL=http://localhost:5000
