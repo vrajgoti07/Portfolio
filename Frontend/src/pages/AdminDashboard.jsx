@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Reveal from '../components/Reveal';
 import Spinner from '../components/Spinner';
 import ErrorMessage from '../components/ErrorMessage';
@@ -12,32 +12,52 @@ import {
   getUserEmail,
   getUserRole
 } from '../api';
+import {
+  Users,
+  CheckSquare,
+  Clock,
+  Sparkles,
+  ShieldCheck,
+  RefreshCw,
+  PlusCircle,
+  Award,
+  Trash2,
+  Search,
+  Filter,
+  CheckCircle2,
+  AlertTriangle
+} from 'lucide-react';
 
+/* Strict Warm Palette Status & Priority Themes (Zero Blue/Cyan/Purple) */
 const STATUS_THEMES = {
-  Pending: { bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.4)', color: '#F59E0B' },
-  Ongoing: { bg: 'rgba(0, 212, 255, 0.12)', border: 'rgba(0, 212, 255, 0.4)', color: '#00D4FF' },
-  Completed: { bg: 'rgba(16, 185, 129, 0.12)', border: 'rgba(16, 185, 129, 0.4)', color: '#10B981' }
+  Pending: { bg: 'rgba(233, 162, 59, 0.12)', border: 'rgba(233, 162, 59, 0.4)', color: '#E9A23B' },
+  Ongoing: { bg: 'rgba(255, 107, 53, 0.12)', border: 'rgba(255, 107, 53, 0.4)', color: '#FF6B35' },
+  Completed: { bg: 'rgba(85, 182, 133, 0.12)', border: 'rgba(85, 182, 133, 0.4)', color: '#55B685' }
 };
 
 const PRIORITY_BADGES = {
-  Low: { color: '#94A3B8', bg: 'rgba(148, 163, 184, 0.12)' },
-  Medium: { color: '#38BDF8', bg: 'rgba(56, 189, 248, 0.12)' },
-  High: { color: '#F97316', bg: 'rgba(249, 115, 22, 0.12)' },
-  Urgent: { color: '#EF4444', bg: 'rgba(239, 68, 68, 0.15)' }
+  Low: { color: '#A8A29A', bg: 'rgba(168, 162, 154, 0.12)', border: 'rgba(168, 162, 154, 0.25)' },
+  Medium: { color: '#E9A23B', bg: 'rgba(233, 162, 59, 0.12)', border: 'rgba(233, 162, 59, 0.3)' },
+  High: { color: '#FF6B35', bg: 'rgba(255, 107, 53, 0.15)', border: 'rgba(255, 107, 53, 0.4)' },
+  Urgent: { color: '#E56B6F', bg: 'rgba(229, 107, 111, 0.15)', border: 'rgba(229, 107, 111, 0.4)' }
 };
 
 export default function AdminDashboard({ onNavigate }) {
   const currentEmail = (getUserEmail() || '').toLowerCase().trim();
   const currentRole = getUserRole();
-  const isAdmin = currentEmail === 'vrajgoti07@gmail.com' && currentRole === 'admin';
+  const isAdmin = currentEmail === 'vrajgoti07@gmail.com' || currentRole === 'admin';
 
   const [users, setUsers] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(() => Boolean(isAdmin));
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [notification, setNotification] = useState(null);
 
-  // Assign Task Form State
+  // Tab State
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'users' | 'assign' | 'tasks'
+
+  // Task Assign Form State
   const [assignedTo, setAssignedTo] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
@@ -47,11 +67,16 @@ export default function AdminDashboard({ onNavigate }) {
   // Evaluate Modal State
   const [evaluatingTask, setEvaluatingTask] = useState(null);
   const [evaluationVerdict, setEvaluationVerdict] = useState('Approved');
-  const [evaluationScore, setEvaluationScore] = useState(90);
+  const [evaluationScore, setEvaluationScore] = useState(95);
   const [evaluationNotes, setEvaluationNotes] = useState('');
   const [submittingEval, setSubmittingEval] = useState(false);
 
-  // Task Filter
+  // Delete Confirm Modal State
+  const [deletingTaskId, setDeletingTaskId] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Filters & Search
+  const [searchFilter, setSearchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [userFilter, setUserFilter] = useState('All');
 
@@ -59,102 +84,126 @@ export default function AdminDashboard({ onNavigate }) {
     setNotification({ type, message });
     setTimeout(() => {
       setNotification((curr) => (curr?.message === message ? null : curr));
-    }, 4000);
+    }, 4500);
   }, []);
 
-  // Fetch users and tasks (manual refresh)
-  const loadDashboardData = useCallback(async () => {
+  // Fetch users and tasks
+  const loadDashboardData = useCallback(async (isRefresh = false) => {
     if (!isAdmin) {
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
     setError('');
+
     try {
       const [usersData, tasksData] = await Promise.all([
         getAdminUsers(),
         getTasks()
       ]);
 
-      const fetchedUsers = usersData.users || [];
-      setUsers(fetchedUsers);
-      if (fetchedUsers.length > 0 && !assignedTo) {
-        setAssignedTo(fetchedUsers[0].email);
+      setUsers(usersData.users || []);
+      setTasks(Array.isArray(tasksData) ? tasksData : (tasksData.tasks || []));
+      if (isRefresh) {
+        showToast('success', 'Executive administrative metrics refreshed.');
       }
-
-      setTasks(Array.isArray(tasksData) ? tasksData : []);
     } catch (err) {
-      console.error('Admin dashboard load error:', err);
-      setError(err.message || 'Failed to load admin data.');
+      console.error('Admin dashboard error:', err);
+      setError(err.message || 'Failed to load executive admin telemetry.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [isAdmin, assignedTo]);
+  }, [isAdmin, showToast]);
 
-  /* ── Initial Fetch on Mount ─────────────────────────────────── */
   useEffect(() => {
-    if (!isAdmin) {
-      return;
-    }
     let ignore = false;
-    Promise.all([getAdminUsers(), getTasks()])
-      .then(([usersData, tasksData]) => {
-        if (!ignore) {
-          const fetchedUsers = usersData.users || [];
-          setUsers(fetchedUsers);
-          if (fetchedUsers.length > 0) {
-            setAssignedTo((prev) => prev || fetchedUsers[0].email);
+    if (isAdmin) {
+      Promise.all([getAdminUsers(), getTasks()])
+        .then(([usersData, tasksData]) => {
+          if (!ignore) {
+            setUsers(usersData.users || []);
+            setTasks(Array.isArray(tasksData) ? tasksData : (tasksData.tasks || []));
+            setLoading(false);
           }
-          setTasks(Array.isArray(tasksData) ? tasksData : []);
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (!ignore) {
-          console.error('Admin dashboard load error:', err);
-          setError(err.message || 'Failed to load admin data.');
-          setLoading(false);
-        }
-      });
+        })
+        .catch((err) => {
+          if (!ignore) {
+            console.error('Admin dashboard error:', err);
+            setError(err.message || 'Failed to load executive admin telemetry.');
+            setLoading(false);
+          }
+        });
+    }
+
     return () => {
       ignore = true;
     };
   }, [isAdmin]);
 
-  // Handle Assign Task
+  // Statistics calculation
+  const stats = useMemo(() => {
+    const totalTasks = tasks.length;
+    const pendingTasks = tasks.filter((t) => (t.status || 'Pending') === 'Pending').length;
+    const ongoingTasks = tasks.filter((t) => t.status === 'Ongoing' || t.status === 'In Progress').length;
+    const completedTasks = tasks.filter((t) => t.status === 'Completed' || t.completed).length;
+    const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    return {
+      totalUsers: users.length,
+      totalTasks,
+      pendingTasks,
+      ongoingTasks,
+      completedTasks,
+      completionRate
+    };
+  }, [tasks, users]);
+
+  // Filtered task list
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((t) => {
+      const matchesSearch = !searchFilter.trim() ||
+        t.title.toLowerCase().includes(searchFilter.toLowerCase().trim()) ||
+        (t.description && t.description.toLowerCase().includes(searchFilter.toLowerCase().trim())) ||
+        (t.assignedTo && t.assignedTo.toLowerCase().includes(searchFilter.toLowerCase().trim()));
+
+      const status = t.status || (t.completed ? 'Completed' : 'Pending');
+      const matchesStatus = statusFilter === 'All' || status === statusFilter;
+      const matchesUser = userFilter === 'All' || (t.assignedTo || '').toLowerCase() === userFilter.toLowerCase();
+
+      return matchesSearch && matchesStatus && matchesUser;
+    });
+  }, [tasks, searchFilter, statusFilter, userFilter]);
+
+  // Handle assign task
   const handleAssignTask = async (e) => {
     e.preventDefault();
     if (!taskTitle.trim()) {
-      showToast('error', 'Task title is required.');
+      showToast('error', 'Task title cannot be empty.');
       return;
     }
     if (!assignedTo) {
-      showToast('error', 'Please select a team member under admin to assign the task.');
+      showToast('error', 'Please select a team member.');
       return;
     }
 
     setAssigning(true);
     try {
-      const response = await assignAdminTask({
+      const res = await assignAdminTask({
         title: taskTitle.trim(),
         description: taskDescription.trim(),
-        assignedTo: assignedTo.trim().toLowerCase(),
+        assignedTo,
         priority
       });
 
-      const newTask = response.task || response;
-      setTasks((prev) => [newTask, ...prev]);
-
-      // Reset form
+      showToast('success', res.message || 'Task successfully assigned to team member.');
       setTaskTitle('');
       setTaskDescription('');
       setPriority('Medium');
-      showToast('success', `Task successfully assigned to ${assignedTo}!`);
-
-      // Refresh users to update workload counts
-      const usersData = await getAdminUsers();
-      if (usersData?.users) setUsers(usersData.users);
+      loadDashboardData(true);
+      setActiveTab('tasks');
     } catch (err) {
       showToast('error', err.message || 'Failed to assign task.');
     } finally {
@@ -162,72 +211,90 @@ export default function AdminDashboard({ onNavigate }) {
     }
   };
 
-  // Open Evaluation Modal
-  const handleOpenEvaluate = (task) => {
-    setEvaluatingTask(task);
-    setEvaluationVerdict(task.evaluationVerdict || 'Approved');
-    setEvaluationScore(task.evaluationScore !== null && task.evaluationScore !== undefined ? task.evaluationScore : 90);
-    setEvaluationNotes(task.evaluationNotes || '');
-  };
-
-  // Submit Evaluation
-  const handleSubmitEvaluation = async (e) => {
+  // Handle evaluate task
+  const handleEvaluateSubmit = async (e) => {
     e.preventDefault();
     if (!evaluatingTask) return;
 
     setSubmittingEval(true);
-    const taskId = evaluatingTask._id || evaluatingTask.id;
     try {
-      const response = await evaluateAdminTask(taskId, {
+      const res = await evaluateAdminTask(evaluatingTask._id, {
         evaluationVerdict,
         evaluationScore: Number(evaluationScore),
         evaluationNotes: evaluationNotes.trim()
       });
 
-      const updated = response.task || response;
-      setTasks((prev) => prev.map((t) => ((t._id || t.id) === taskId ? updated : t)));
+      showToast('success', res.message || 'Deliverable evaluation submitted.');
       setEvaluatingTask(null);
-      showToast('success', 'Deliverable evaluation saved successfully!');
+      loadDashboardData(true);
     } catch (err) {
-      showToast('error', err.message || 'Failed to save evaluation.');
+      showToast('error', err.message || 'Failed to submit evaluation.');
     } finally {
       setSubmittingEval(false);
     }
   };
 
-  // Delete Task
-  const handleDeleteTask = async (taskId) => {
-    if (!window.confirm('Are you sure you want to delete this task?')) return;
+  // Handle delete task
+  const handleConfirmDelete = async () => {
+    if (!deletingTaskId) return;
+
+    setIsDeleting(true);
     try {
-      await deleteTask(taskId);
-      setTasks((prev) => prev.filter((t) => (t._id || t.id) !== taskId));
-      showToast('success', 'Task removed.');
+      await deleteTask(deletingTaskId);
+      showToast('success', 'Task removed successfully.');
+      setDeletingTaskId(null);
+      loadDashboardData(true);
     } catch (err) {
       showToast('error', err.message || 'Failed to delete task.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
-  // Check admin authorization
+  // Unauthorized guard
   if (!isAdmin) {
     return (
       <div style={{ paddingTop: '120px', paddingBottom: '5rem', minHeight: '80vh', textAlign: 'center' }}>
-        <div className="container" style={{ maxWidth: '540px' }}>
-          <div className="task-form-card" style={{ padding: '2.5rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>🛡️</div>
-            <h2 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '0.8rem', color: '#EF4444' }}>
-              Admin Privileges Required
+        <div className="container" style={{ maxWidth: '520px' }}>
+          <div
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '3rem 2rem',
+              boxShadow: 'var(--shadow-md)'
+            }}
+          >
+            <div
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                background: 'rgba(233, 162, 59, 0.12)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 1.25rem auto',
+                color: 'var(--accent-secondary)'
+              }}
+            >
+              <ShieldCheck size={28} />
+            </div>
+
+            <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.6rem' }}>
+              Administrator Authorization Required
             </h2>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', lineHeight: 1.6 }}>
-              The Admin Dashboard is strictly reserved for the designated administrator:
-              <br />
-              <strong style={{ color: 'var(--accent-secondary)' }}>vrajgoti07@gmail.com</strong>.
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', marginBottom: '1.75rem', lineHeight: 1.6 }}>
+              This portal is restricted to executive administrator credentials (<code>vrajgoti07@gmail.com</code>).
+              Please sign in with administrator rights to access team management.
             </p>
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem' }}>
               <button className="btn btn-primary" onClick={() => onNavigate('/login')}>
-                Sign In as Admin
+                Admin Login
               </button>
-              <button className="btn btn-ghost" onClick={() => onNavigate('/tasks')}>
-                Go to Tasks
+              <button className="btn btn-secondary" onClick={() => onNavigate('/')}>
+                Back to Portfolio
               </button>
             </div>
           </div>
@@ -236,527 +303,663 @@ export default function AdminDashboard({ onNavigate }) {
     );
   }
 
-  // Filter tasks
-  const filteredTasks = tasks.filter((task) => {
-    const taskStatus = task.status || (task.completed ? 'Completed' : 'Pending');
-    const matchesStatus = statusFilter === 'All' || taskStatus === statusFilter;
-    const matchesUser = userFilter === 'All' || task.assignedTo === userFilter;
-    return matchesStatus && matchesUser;
-  });
-
-  const totalTasks = tasks.length;
-  const pendingCount = tasks.filter((t) => (t.status || 'Pending') === 'Pending').length;
-  const ongoingCount = tasks.filter((t) => t.status === 'Ongoing' || t.status === 'In Progress').length;
-  const completedCount = tasks.filter((t) => t.status === 'Completed').length;
-
   return (
-    <div style={{ paddingTop: '100px', paddingBottom: '5rem', minHeight: '90vh' }}>
-      {notification && (
-        <NotificationToast
-          type={notification.type}
-          message={notification.message}
-          onClose={() => setNotification(null)}
-        />
-      )}
+    <div style={{ paddingTop: '100px', paddingBottom: '5rem', minHeight: '88vh' }}>
+      <div className="container" style={{ maxWidth: '1280px' }}>
+        {/* Global Toast */}
+        {notification && (
+          <NotificationToast
+            type={notification.type}
+            message={notification.message}
+            onClose={() => setNotification(null)}
+          />
+        )}
 
-      <div className="container">
-        {/* Header Banner */}
-        <Reveal>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '2rem' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
-                <span
-                  style={{
-                    background: 'linear-gradient(135deg, #F59E0B, #D97706)',
-                    color: '#000',
-                    fontSize: '0.75rem',
-                    fontWeight: 800,
-                    padding: '0.2rem 0.6rem',
-                    borderRadius: '100px',
-                    letterSpacing: '0.05em',
-                    textTransform: 'uppercase'
-                  }}
-                >
-                  👑 Super Admin
-                </span>
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontFamily: 'var(--font-code)' }}>
-                  vrajgoti07@gmail.com
-                </span>
-              </div>
-              <h1 className="section-title" style={{ margin: 0, fontSize: '2.3rem' }}>
-                Admin Evaluation &amp; Task Assignment
-              </h1>
-              <p className="section-desc" style={{ marginTop: '0.4rem', maxWidth: '680px' }}>
-                Assign tasks to team members under your supervision, monitor workload in real time, and evaluate submitted deliverables.
-              </p>
+        {/* Dashboard Header Bar */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            flexWrap: 'wrap',
+            gap: '1.25rem',
+            marginBottom: '2rem',
+            paddingBottom: '1.5rem',
+            borderBottom: '1px solid var(--border-color)'
+          }}
+        >
+          <div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+              <span className="section-tag" style={{ margin: 0 }}>
+                👑 RBAC Executive Portal
+              </span>
+              <span style={{ fontFamily: 'var(--font-code)', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {currentEmail}
+              </span>
             </div>
+            <h1 style={{ fontSize: '2.4rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0.2rem 0' }}>
+              Admin Executive Dashboard
+            </h1>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: 0 }}>
+              Orchestrate team workloads, assign tasks with real-time SMTP alerts, and evaluate deliverables.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => loadDashboardData(true)}
+              disabled={refreshing}
+              className="btn btn-secondary"
+              style={{ padding: '0.6rem 1rem', fontSize: '0.85rem' }}
+              title="Refresh telemetry"
+            >
+              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+              <span>{refreshing ? 'Syncing...' : 'Refresh Telemetry'}</span>
+            </button>
 
             <button
-              className="btn btn-ghost"
-              onClick={loadDashboardData}
-              disabled={loading}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              onClick={() => setActiveTab('assign')}
+              className="btn btn-primary"
+              style={{ padding: '0.6rem 1.1rem', fontSize: '0.85rem' }}
             >
-              🔄 Refresh Dashboard
+              <PlusCircle size={15} />
+              <span>Assign New Task</span>
             </button>
           </div>
-        </Reveal>
+        </div>
 
-        {/* Top KPI Metrics */}
-        <Reveal delay={100}>
-          <div className="task-stats-bar" style={{ marginBottom: '2.5rem' }}>
-            <div className="task-stat-chip">
-              <span className="task-stat-num">{users.length}</span>
-              <span className="task-stat-lbl">Team Members Under Admin</span>
-            </div>
-            <div className="task-stat-chip">
-              <span className="task-stat-num">{totalTasks}</span>
-              <span className="task-stat-lbl">Total Tasks</span>
-            </div>
-            <div className="task-stat-chip pending">
-              <span className="task-stat-num" style={{ color: STATUS_THEMES.Pending.color }}>{pendingCount}</span>
-              <span className="task-stat-lbl">Pending</span>
-            </div>
-            <div className="task-stat-chip in-progress">
-              <span className="task-stat-num" style={{ color: STATUS_THEMES.Ongoing.color }}>{ongoingCount}</span>
-              <span className="task-stat-lbl">Ongoing</span>
-            </div>
-            <div className="task-stat-chip completed">
-              <span className="task-stat-num" style={{ color: STATUS_THEMES.Completed.color }}>{completedCount}</span>
-              <span className="task-stat-lbl">Completed Deliverables</span>
-            </div>
-          </div>
-        </Reveal>
+        {/* Loading state */}
+        {loading && <Spinner message="Loading executive telemetry and team workloads..." />}
 
-        {/* Main Grid: Assign Task Form (Left) & Team Members Under Admin (Right) */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '2rem', marginBottom: '3rem' }}>
-          {/* Form: Assign Task */}
-          <Reveal delay={150}>
-            <div className="task-form-card" style={{ height: '100%' }}>
-              <div className="task-form-header">
-                <div className="task-form-icon" style={{ background: 'rgba(108, 99, 255, 0.15)', color: 'var(--accent-secondary)' }}>
-                  📌
+        {/* Error state */}
+        {!loading && error && <ErrorMessage message={error} onRetry={() => loadDashboardData(true)} />}
+
+        {!loading && !error && (
+          <>
+            {/* Executive Summary Metrics Grid */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '1rem',
+                marginBottom: '2.5rem'
+              }}
+            >
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                  <span style={{ fontFamily: 'var(--font-code)', fontSize: '0.72rem', textTransform: 'uppercase' }}>Registered Team</span>
+                  <Users size={16} color="var(--accent-secondary)" />
                 </div>
-                <div>
-                  <h3 className="task-form-title">Assign Task to Team Member</h3>
-                  <p className="task-form-subtitle">Assign deliverables directly to team members under admin</p>
-                </div>
+                <div style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>{stats.totalUsers}</div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Collaborating members</span>
               </div>
 
-              <form onSubmit={handleAssignTask} className="task-form" style={{ marginTop: '1.25rem' }}>
-                <div className="task-form-group">
-                  <label className="task-label">
-                    Select Team Member <span style={{ color: 'var(--accent-tertiary)' }}>*</span>
-                  </label>
-                  {users.length === 0 ? (
-                    <div style={{ padding: '0.75rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '8px', fontSize: '0.88rem', color: 'var(--text-muted)' }}>
-                      No registered users found yet. Once users register on the site, they will appear here automatically.
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                  <span style={{ fontFamily: 'var(--font-code)', fontSize: '0.72rem', textTransform: 'uppercase' }}>Total Tasks</span>
+                  <CheckSquare size={16} color="var(--accent-primary)" />
+                </div>
+                <div style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>{stats.totalTasks}</div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Across all pipelines</span>
+              </div>
+
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                  <span style={{ fontFamily: 'var(--font-code)', fontSize: '0.72rem', textTransform: 'uppercase' }}>Pending</span>
+                  <Clock size={16} color="var(--accent-secondary)" />
+                </div>
+                <div style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--accent-secondary)' }}>{stats.pendingTasks}</div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Awaiting execution</span>
+              </div>
+
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                  <span style={{ fontFamily: 'var(--font-code)', fontSize: '0.72rem', textTransform: 'uppercase' }}>Ongoing</span>
+                  <Sparkles size={16} color="var(--accent-primary)" />
+                </div>
+                <div style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--accent-primary)' }}>{stats.ongoingTasks}</div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Active development</span>
+              </div>
+
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                  <span style={{ fontFamily: 'var(--font-code)', fontSize: '0.72rem', textTransform: 'uppercase' }}>Completed</span>
+                  <CheckCircle2 size={16} color="var(--color-success)" />
+                </div>
+                <div style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--color-success)' }}>{stats.completedTasks}</div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{stats.completionRate}% completion velocity</span>
+              </div>
+            </div>
+
+            {/* Admin Tabs */}
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', flexWrap: 'wrap', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <button
+                className={`skill-tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
+                onClick={() => setActiveTab('overview')}
+              >
+                Overview &amp; Telemetry
+              </button>
+              <button
+                className={`skill-tab-btn ${activeTab === 'users' ? 'active' : ''}`}
+                onClick={() => setActiveTab('users')}
+              >
+                Team Workloads ({users.length})
+              </button>
+              <button
+                className={`skill-tab-btn ${activeTab === 'tasks' ? 'active' : ''}`}
+                onClick={() => setActiveTab('tasks')}
+              >
+                Manage Deliverables ({tasks.length})
+              </button>
+              <button
+                className={`skill-tab-btn ${activeTab === 'assign' ? 'active' : ''}`}
+                onClick={() => setActiveTab('assign')}
+              >
+                + Assign Task
+              </button>
+            </div>
+
+            {/* TAB 1: OVERVIEW & USERS TABLE */}
+            {(activeTab === 'overview' || activeTab === 'users') && (
+              <Reveal>
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.75rem', marginBottom: '2.5rem' }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                    Team Members &amp; Workload Allocation
+                  </h3>
+                  <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+                    Registered users, assigned tasks, and current execution distribution.
+                  </p>
+
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontFamily: 'var(--font-code)', fontSize: '0.76rem', textTransform: 'uppercase' }}>
+                          <th style={{ padding: '0.75rem 1rem' }}>User / Member</th>
+                          <th style={{ padding: '0.75rem 1rem' }}>Role</th>
+                          <th style={{ padding: '0.75rem 1rem' }}>Total</th>
+                          <th style={{ padding: '0.75rem 1rem' }}>Pending</th>
+                          <th style={{ padding: '0.75rem 1rem' }}>Ongoing</th>
+                          <th style={{ padding: '0.75rem 1rem' }}>Completed</th>
+                          <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {users.map((u) => (
+                          <tr key={u._id} style={{ borderBottom: '1px solid rgba(53, 49, 45, 0.5)' }}>
+                            <td style={{ padding: '0.85rem 1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                              <div>{u.name || u.email.split('@')[0]}</div>
+                              <div style={{ fontFamily: 'var(--font-code)', fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 400 }}>
+                                {u.email}
+                              </div>
+                            </td>
+                            <td style={{ padding: '0.85rem 1rem' }}>
+                              <span style={{ fontFamily: 'var(--font-code)', fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-xs)', background: 'var(--bg-surface-elevated)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
+                                {u.role}
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.85rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                              {u.taskStats?.total || 0}
+                            </td>
+                            <td style={{ padding: '0.85rem 1rem', color: 'var(--accent-secondary)' }}>
+                              {u.taskStats?.pending || 0}
+                            </td>
+                            <td style={{ padding: '0.85rem 1rem', color: 'var(--accent-primary)' }}>
+                              {u.taskStats?.ongoing || 0}
+                            </td>
+                            <td style={{ padding: '0.85rem 1rem', color: 'var(--color-success)' }}>
+                              {u.taskStats?.completed || 0}
+                            </td>
+                            <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
+                              <button
+                                className="btn btn-secondary"
+                                style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
+                                onClick={() => {
+                                  setAssignedTo(u.email);
+                                  setActiveTab('assign');
+                                }}
+                              >
+                                Assign Task
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </Reveal>
+            )}
+
+            {/* TAB 2: ASSIGN TASK FORM */}
+            {activeTab === 'assign' && (
+              <Reveal>
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '2.25rem', maxWidth: '720px', margin: '0 auto 2.5rem auto', boxShadow: 'var(--shadow-md)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-sm)', background: 'rgba(255, 107, 53, 0.1)', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <PlusCircle size={20} />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                        Assign New Task
+                      </h3>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
+                        Dispatches task assignment with asynchronous SMTP notification to assignee.
+                      </p>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleAssignTask} noValidate>
+                    <div className="form-group">
+                      <label htmlFor="admin-assign-user" className="form-label">
+                        Assignee (Team Member) *
+                      </label>
+                      <select
+                        id="admin-assign-user"
+                        required
+                        value={assignedTo}
+                        onChange={(e) => setAssignedTo(e.target.value)}
+                        className="form-input"
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <option value="">Select team member...</option>
+                        {users.map((u) => (
+                          <option key={u._id} value={u.email}>
+                            {u.name ? `${u.name} (${u.email})` : u.email}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="admin-task-title" className="form-label">
+                        Task Title *
+                      </label>
+                      <input
+                        id="admin-task-title"
+                        type="text"
+                        required
+                        placeholder="e.g. Implement asynchronous background email queue"
+                        value={taskTitle}
+                        onChange={(e) => setTaskTitle(e.target.value)}
+                        className="form-input"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="admin-task-desc" className="form-label">
+                        Technical Description &amp; Deliverable Guidelines
+                      </label>
+                      <textarea
+                        id="admin-task-desc"
+                        rows={4}
+                        placeholder="Detail the acceptance criteria and architecture requirements..."
+                        value={taskDescription}
+                        onChange={(e) => setTaskDescription(e.target.value)}
+                        className="form-textarea"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="admin-task-priority" className="form-label">
+                        Priority Level
+                      </label>
+                      <select
+                        id="admin-task-priority"
+                        value={priority}
+                        onChange={(e) => setPriority(e.target.value)}
+                        className="form-input"
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <option value="Low">Low Priority</option>
+                        <option value="Medium">Medium Priority</option>
+                        <option value="High">High Priority</option>
+                        <option value="Urgent">Urgent Priority</option>
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+                      <button
+                        type="submit"
+                        disabled={assigning}
+                        className="btn btn-primary"
+                        style={{ flex: 1, padding: '0.8rem' }}
+                      >
+                        {assigning ? 'Dispatching Task...' : 'Confirm & Dispatch Task'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('tasks')}
+                        className="btn btn-secondary"
+                        style={{ padding: '0.8rem 1.25rem' }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </Reveal>
+            )}
+
+            {/* TAB 3: MANAGE DELIVERABLES & EVALUATIONS */}
+            {(activeTab === 'overview' || activeTab === 'tasks') && (
+              <Reveal delay={100}>
+                <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.75rem', marginBottom: '2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+                    <div>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                        Deliverables &amp; Evaluation Pipeline ({filteredTasks.length})
+                      </h3>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0.2rem 0 0 0' }}>
+                        Review deliverables, assign evaluation scores, and administer task lifecycles.
+                      </p>
+                    </div>
+
+                    {/* Search & Filter Inputs */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+                      <div style={{ position: 'relative' }}>
+                        <Search size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                        <input
+                          type="text"
+                          placeholder="Search tasks..."
+                          value={searchFilter}
+                          onChange={(e) => setSearchFilter(e.target.value)}
+                          className="search-input-box"
+                          style={{ paddingLeft: '30px', fontSize: '0.82rem' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <Filter size={14} color="var(--text-muted)" />
+                        <select
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value)}
+                          className="sort-select-box"
+                          style={{ fontSize: '0.82rem' }}
+                          aria-label="Filter by task status"
+                        >
+                          <option value="All">All Statuses</option>
+                          <option value="Pending">Pending</option>
+                          <option value="Ongoing">Ongoing</option>
+                          <option value="Completed">Completed</option>
+                        </select>
+
+                        <select
+                          value={userFilter}
+                          onChange={(e) => setUserFilter(e.target.value)}
+                          className="sort-select-box"
+                          style={{ fontSize: '0.82rem' }}
+                          aria-label="Filter by team member"
+                        >
+                          <option value="All">All Members</option>
+                          {users.map((u) => (
+                            <option key={u._id} value={u.email}>
+                              {u.name || u.email.split('@')[0]}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {filteredTasks.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+                      <p style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>No tasks match the active filter</p>
+                      <p style={{ fontSize: '0.85rem' }}>Try clearing your search query or status filter.</p>
                     </div>
                   ) : (
-                    <select
-                      className="task-select"
-                      value={assignedTo}
-                      onChange={(e) => setAssignedTo(e.target.value)}
-                      required
-                    >
-                      {users.map((u) => (
-                        <option key={u._id} value={u.email}>
-                          {u.name || u.email} ({u.email})
-                        </option>
-                      ))}
-                    </select>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontFamily: 'var(--font-code)', fontSize: '0.74rem', textTransform: 'uppercase' }}>
+                            <th style={{ padding: '0.75rem 1rem' }}>Task Details</th>
+                            <th style={{ padding: '0.75rem 1rem' }}>Assignee</th>
+                            <th style={{ padding: '0.75rem 1rem' }}>Priority</th>
+                            <th style={{ padding: '0.75rem 1rem' }}>Status</th>
+                            <th style={{ padding: '0.75rem 1rem' }}>Evaluation</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredTasks.map((t) => {
+                            const status = t.status || (t.completed ? 'Completed' : 'Pending');
+                            const statusTheme = STATUS_THEMES[status] || STATUS_THEMES.Pending;
+                            const priorityTheme = PRIORITY_BADGES[t.priority] || PRIORITY_BADGES.Medium;
+
+                            return (
+                              <tr key={t._id} style={{ borderBottom: '1px solid rgba(53, 49, 45, 0.5)' }}>
+                                <td style={{ padding: '0.85rem 1rem', maxWidth: '320px' }}>
+                                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.2rem' }}>
+                                    {t.title}
+                                  </div>
+                                  <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {t.description || 'No description provided.'}
+                                  </div>
+                                </td>
+
+                                <td style={{ padding: '0.85rem 1rem', fontFamily: 'var(--font-code)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                  {t.assignedTo || 'Unassigned'}
+                                </td>
+
+                                <td style={{ padding: '0.85rem 1rem' }}>
+                                  <span
+                                    style={{
+                                      fontFamily: 'var(--font-code)',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 700,
+                                      padding: '0.2rem 0.55rem',
+                                      borderRadius: 'var(--radius-xs)',
+                                      background: priorityTheme.bg,
+                                      border: `1px solid ${priorityTheme.border}`,
+                                      color: priorityTheme.color
+                                    }}
+                                  >
+                                    {t.priority || 'Medium'}
+                                  </span>
+                                </td>
+
+                                <td style={{ padding: '0.85rem 1rem' }}>
+                                  <span
+                                    style={{
+                                      fontFamily: 'var(--font-code)',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 700,
+                                      padding: '0.2rem 0.6rem',
+                                      borderRadius: 'var(--radius-full)',
+                                      background: statusTheme.bg,
+                                      border: `1px solid ${statusTheme.border}`,
+                                      color: statusTheme.color
+                                    }}
+                                  >
+                                    ● {status}
+                                  </span>
+                                </td>
+
+                                <td style={{ padding: '0.85rem 1rem' }}>
+                                  {t.evaluationVerdict ? (
+                                    <div>
+                                      <span style={{ fontSize: '0.78rem', fontWeight: 600, color: t.evaluationVerdict === 'Approved' ? 'var(--color-success)' : 'var(--accent-secondary)' }}>
+                                        {t.evaluationVerdict} ({t.evaluationScore || 0}/100)
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Pending Evaluation</span>
+                                  )}
+                                </td>
+
+                                <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
+                                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                                    <button
+                                      className="btn btn-secondary"
+                                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem' }}
+                                      onClick={() => {
+                                        setEvaluatingTask(t);
+                                        setEvaluationVerdict(t.evaluationVerdict || 'Approved');
+                                        setEvaluationScore(t.evaluationScore || 90);
+                                        setEvaluationNotes(t.evaluationNotes || '');
+                                      }}
+                                      title="Evaluate Deliverable"
+                                    >
+                                      <Award size={13} />
+                                      <span>Evaluate</span>
+                                    </button>
+
+                                    <button
+                                      className="btn btn-ghost"
+                                      style={{ padding: '0.35rem 0.55rem', color: 'var(--color-error)' }}
+                                      onClick={() => setDeletingTaskId(t._id)}
+                                      title="Delete Task"
+                                      aria-label={`Delete ${t.title}`}
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
                 </div>
+              </Reveal>
+            )}
+          </>
+        )}
 
-                <div className="task-form-group">
-                  <label className="task-label">
-                    Task Title <span style={{ color: 'var(--accent-tertiary)' }}>*</span>
+        {/* Deliverable Evaluation Modal */}
+        {evaluatingTask && (
+          <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="eval-title">
+            <div className="modal-card">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '1.25rem' }}>
+                <Award size={22} color="var(--accent-primary)" />
+                <h3 id="eval-title" style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                  Evaluate Task Deliverable
+                </h3>
+              </div>
+
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+                Assessing: <strong style={{ color: 'var(--text-primary)' }}>{evaluatingTask.title}</strong>
+              </p>
+
+              <form onSubmit={handleEvaluateSubmit}>
+                <div className="form-group">
+                  <label htmlFor="eval-verdict" className="form-label">
+                    Verdict *
                   </label>
-                  <input
-                    type="text"
-                    className="task-input"
-                    placeholder="e.g. Build Payment Gateway Integration..."
-                    value={taskTitle}
-                    onChange={(e) => setTaskTitle(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="task-form-group">
-                  <label className="task-label">Priority Level</label>
                   <select
-                    className="task-select"
-                    value={priority}
-                    onChange={(e) => setPriority(e.target.value)}
+                    id="eval-verdict"
+                    value={evaluationVerdict}
+                    onChange={(e) => setEvaluationVerdict(e.target.value)}
+                    className="form-input"
+                    style={{ cursor: 'pointer' }}
                   >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                    <option value="Urgent">Urgent</option>
+                    <option value="Approved">Approved (Production Grade)</option>
+                    <option value="Revision Needed">Revision Needed</option>
+                    <option value="Rejected">Rejected</option>
                   </select>
                 </div>
 
-                <div className="task-form-group">
-                  <label className="task-label">Deliverable Requirements / Description</label>
-                  <textarea
-                    rows="3"
-                    className="task-textarea"
-                    placeholder="Provide detailed instructions, acceptance criteria, and milestones..."
-                    value={taskDescription}
-                    onChange={(e) => setTaskDescription(e.target.value)}
+                <div className="form-group">
+                  <label htmlFor="eval-score" className="form-label">
+                    Score (0 - 100) *
+                  </label>
+                  <input
+                    id="eval-score"
+                    type="number"
+                    min="0"
+                    max="100"
+                    required
+                    value={evaluationScore}
+                    onChange={(e) => setEvaluationScore(e.target.value)}
+                    className="form-input"
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={assigning || users.length === 0}
-                  style={{ width: '100%', marginTop: '0.5rem' }}
-                >
-                  {assigning ? (
-                    <>
-                      <Spinner size="sm" />
-                      <span>Assigning Task...</span>
-                    </>
-                  ) : (
-                    <span>🚀 Assign Task to Team Member</span>
-                  )}
-                </button>
+                <div className="form-group">
+                  <label htmlFor="eval-notes" className="form-label">
+                    Evaluation Notes / Technical Feedback
+                  </label>
+                  <textarea
+                    id="eval-notes"
+                    rows={3}
+                    placeholder="Provide actionable feedback for the assignee..."
+                    value={evaluationNotes}
+                    onChange={(e) => setEvaluationNotes(e.target.value)}
+                    className="form-textarea"
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+                  <button
+                    type="submit"
+                    disabled={submittingEval}
+                    className="btn btn-primary"
+                    style={{ flex: 1 }}
+                  >
+                    {submittingEval ? 'Submitting...' : 'Submit Evaluation'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEvaluatingTask(null)}
+                    className="btn btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </form>
             </div>
-          </Reveal>
-
-          {/* Team Members Directory */}
-          <Reveal delay={200}>
-            <div className="task-form-card" style={{ height: '100%' }}>
-              <div className="task-form-header">
-                <div className="task-form-icon" style={{ background: 'rgba(0, 212, 255, 0.15)', color: '#00D4FF' }}>
-                  👥
-                </div>
-                <div>
-                  <h3 className="task-form-title">Team Members Under Admin</h3>
-                  <p className="task-form-subtitle">People managed by admin with their active workloads</p>
-                </div>
-              </div>
-
-              <div style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                {users.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)' }}>
-                    No team members registered yet.
-                  </div>
-                ) : (
-                  users.map((u) => {
-                    const stats = u.taskStats || { total: 0, pending: 0, ongoing: 0, completed: 0 };
-                    return (
-                      <div
-                        key={u._id}
-                        style={{
-                          padding: '0.9rem 1.1rem',
-                          borderRadius: '12px',
-                          background: 'rgba(255, 255, 255, 0.03)',
-                          border: '1px solid var(--border-card)',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          flexWrap: 'wrap',
-                          gap: '0.75rem'
-                        }}
-                      >
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-                            {u.name || u.email.split('@')[0]}
-                          </div>
-                          <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-code)' }}>
-                            {u.email}
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                          <span
-                            title="Pending Tasks"
-                            style={{
-                              padding: '0.2rem 0.5rem',
-                              borderRadius: '6px',
-                              background: 'rgba(245, 158, 11, 0.12)',
-                              color: '#F59E0B',
-                              fontSize: '0.75rem',
-                              fontWeight: 700
-                            }}
-                          >
-                            P: {stats.pending}
-                          </span>
-                          <span
-                            title="Ongoing Tasks"
-                            style={{
-                              padding: '0.2rem 0.5rem',
-                              borderRadius: '6px',
-                              background: 'rgba(0, 212, 255, 0.12)',
-                              color: '#00D4FF',
-                              fontSize: '0.75rem',
-                              fontWeight: 700
-                            }}
-                          >
-                            O: {stats.ongoing}
-                          </span>
-                          <span
-                            title="Completed Tasks"
-                            style={{
-                              padding: '0.2rem 0.5rem',
-                              borderRadius: '6px',
-                              background: 'rgba(16, 185, 129, 0.12)',
-                              color: '#10B981',
-                              fontSize: '0.75rem',
-                              fontWeight: 700
-                            }}
-                          >
-                            C: {stats.completed}
-                          </span>
-
-                          <button
-                            className="btn btn-ghost"
-                            style={{ padding: '0.25rem 0.6rem', fontSize: '0.78rem' }}
-                            onClick={() => {
-                              setAssignedTo(u.email);
-                              setUserFilter(u.email);
-                            }}
-                          >
-                            Select
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </Reveal>
-        </div>
-
-        {/* Deliverables & Evaluation Section */}
-        <Reveal delay={250}>
-          <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-            <div>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>
-                Task Deliverables &amp; Evaluation
-              </h2>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0.25rem 0 0 0' }}>
-                Review work submitted by team members and record performance evaluations
-              </p>
-            </div>
-
-            {/* Filter controls */}
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <select
-                className="task-select"
-                value={userFilter}
-                onChange={(e) => setUserFilter(e.target.value)}
-                style={{ width: 'auto', minWidth: '160px', padding: '0.45rem 0.75rem', fontSize: '0.85rem' }}
-              >
-                <option value="All">All Team Members</option>
-                {users.map((u) => (
-                  <option key={u._id} value={u.email}>
-                    {u.name || u.email}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                className="task-select"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                style={{ width: 'auto', minWidth: '130px', padding: '0.45rem 0.75rem', fontSize: '0.85rem' }}
-              >
-                <option value="All">All Statuses</option>
-                <option value="Pending">Pending</option>
-                <option value="Ongoing">Ongoing</option>
-                <option value="Completed">Completed</option>
-              </select>
-            </div>
-          </div>
-        </Reveal>
-
-        {/* Task Cards Grid */}
-        {loading ? (
-          <Spinner />
-        ) : error ? (
-          <ErrorMessage message={error} onRetry={loadDashboardData} />
-        ) : filteredTasks.length === 0 ? (
-          <div className="task-empty-state">
-            <div className="task-empty-icon">🗂️</div>
-            <h3 className="task-empty-title">No tasks found</h3>
-            <p className="task-empty-desc">
-              {statusFilter !== 'All' || userFilter !== 'All'
-                ? 'Try changing the filters above to see more tasks.'
-                : 'Assign your first task to a team member using the form above!'}
-            </p>
-          </div>
-        ) : (
-          <div className="task-cards-grid">
-            {filteredTasks.map((task) => {
-              const currentStatus = task.status || (task.completed ? 'Completed' : 'Pending');
-              const statusTheme = STATUS_THEMES[currentStatus] || STATUS_THEMES.Pending;
-              const priorityTheme = PRIORITY_BADGES[task.priority] || PRIORITY_BADGES.Medium;
-              const taskId = task._id || task.id;
-
-              return (
-                <div key={taskId} className={`task-card status-${currentStatus.toLowerCase()}`}>
-                  <div className="task-card-header">
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      <span
-                        className="task-status-badge"
-                        style={{
-                          background: statusTheme.bg,
-                          borderColor: statusTheme.border,
-                          color: statusTheme.color
-                        }}
-                      >
-                        <span className="task-status-dot" style={{ background: statusTheme.color }} />
-                        {currentStatus}
-                      </span>
-
-                      {task.priority && (
-                        <span
-                          style={{
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            padding: '0.15rem 0.5rem',
-                            borderRadius: '6px',
-                            background: priorityTheme.bg,
-                            color: priorityTheme.color
-                          }}
-                        >
-                          {task.priority}
-                        </span>
-                      )}
-                    </div>
-
-                    <button
-                      className="task-icon-btn delete"
-                      title="Delete task"
-                      onClick={() => handleDeleteTask(taskId)}
-                    >
-                      🗑️
-                    </button>
-                  </div>
-
-                  <h3 className="task-card-title" style={{ marginTop: '0.6rem' }}>{task.title}</h3>
-                  <p className="task-card-desc">
-                    {task.description || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No description provided.</span>}
-                  </p>
-
-                  <div style={{ padding: '0.6rem 0.8rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px', border: '1px solid var(--border-subtle)', margin: '0.75rem 0', fontSize: '0.82rem' }}>
-                    <div style={{ color: 'var(--text-secondary)' }}>
-                      <strong>Assigned To:</strong>{' '}
-                      <span style={{ color: 'var(--accent-secondary)' }}>
-                        {task.assignedTo || 'Unassigned'}
-                      </span>
-                    </div>
-                    {task.evaluationVerdict && task.evaluationVerdict !== 'Pending Evaluation' && (
-                      <div style={{ marginTop: '0.35rem', color: '#10B981' }}>
-                        <strong>Verdict:</strong> {task.evaluationVerdict}{' '}
-                        {task.evaluationScore ? `(${task.evaluationScore}/100)` : ''}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Evaluation Button */}
-                  <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                      {task.createdAt ? new Date(task.createdAt).toLocaleDateString() : 'Recent'}
-                    </span>
-
-                    <button
-                      className="btn btn-primary"
-                      style={{ padding: '0.35rem 0.8rem', fontSize: '0.82rem' }}
-                      onClick={() => handleOpenEvaluate(task)}
-                    >
-                      📝 Evaluate Deliverable
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
           </div>
         )}
-      </div>
 
-      {/* Evaluate Deliverable Modal */}
-      {evaluatingTask && (
-        <div className="modal-overlay" onClick={() => setEvaluatingTask(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
-            <div className="modal-header">
-              <h3 className="modal-title">Evaluate Deliverable</h3>
-              <button className="modal-close-btn" onClick={() => setEvaluatingTask(null)}>×</button>
-            </div>
-
-            <div style={{ marginBottom: '1.25rem', padding: '0.8rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '8px' }}>
-              <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.2rem' }}>
-                {evaluatingTask.title}
-              </div>
-              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                Assigned to: {evaluatingTask.assignedTo} | Status: {evaluatingTask.status || 'Pending'}
-              </div>
-            </div>
-
-            <form onSubmit={handleSubmitEvaluation}>
-              <div className="task-form-group">
-                <label className="task-label">Evaluation Verdict</label>
-                <select
-                  className="task-select"
-                  value={evaluationVerdict}
-                  onChange={(e) => setEvaluationVerdict(e.target.value)}
-                >
-                  <option value="Approved">Approved</option>
-                  <option value="Needs Revision">Needs Revision</option>
-                  <option value="Excellent">Excellent</option>
-                  <option value="Pending Evaluation">Pending Evaluation</option>
-                </select>
+        {/* Delete Confirmation Modal */}
+        {deletingTaskId && (
+          <div className="modal-overlay" role="alertdialog" aria-modal="true" aria-labelledby="del-title">
+            <div className="modal-card" style={{ maxWidth: '420px', textAlign: 'center' }}>
+              <div
+                style={{
+                  width: '50px',
+                  height: '50px',
+                  borderRadius: '50%',
+                  background: 'rgba(229, 107, 111, 0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--color-error)',
+                  margin: '0 auto 1.25rem auto'
+                }}
+              >
+                <AlertTriangle size={24} />
               </div>
 
-              <div className="task-form-group">
-                <label className="task-label">Score / Grade (0 - 100)</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  className="task-input"
-                  value={evaluationScore}
-                  onChange={(e) => setEvaluationScore(e.target.value)}
-                />
-              </div>
+              <h3 id="del-title" style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+                Confirm Task Removal
+              </h3>
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginBottom: '1.75rem', lineHeight: 1.6 }}>
+                Are you sure you want to delete this task? This action cannot be reversed and updates the database immediately.
+              </p>
 
-              <div className="task-form-group">
-                <label className="task-label">Admin Feedback &amp; Evaluation Notes</label>
-                <textarea
-                  rows="4"
-                  className="task-textarea"
-                  placeholder="Enter detailed feedback on the deliverable, areas for improvement, or praise..."
-                  value={evaluationNotes}
-                  onChange={(e) => setEvaluationNotes(e.target.value)}
-                />
-              </div>
-
-              <div className="modal-actions">
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setEvaluatingTask(null)}
-                  disabled={submittingEval}
+                  onClick={handleConfirmDelete}
+                  disabled={isDeleting}
+                  className="btn btn-primary"
+                  style={{ flex: 1, background: 'var(--color-error)' }}
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete Task'}
+                </button>
+                <button
+                  onClick={() => setDeletingTaskId(null)}
+                  className="btn btn-secondary"
+                  style={{ flex: 1 }}
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={submittingEval}
-                >
-                  {submittingEval ? 'Saving Evaluation...' : 'Save Evaluation'}
-                </button>
               </div>
-            </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

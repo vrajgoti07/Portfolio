@@ -1,67 +1,107 @@
 import { Terminal, ArrowRight } from 'lucide-react';
 import Reveal from '../components/Reveal';
 
-export default function NotFound({ onBackToHome }) {
+export default function NotFound({ onBackToHome, onNavigate }) {
   return (
-    <div className="notfound-container">
-      {/* Background ambient orbs */}
-      <div className="notfound-glow-1" />
-      <div className="notfound-glow-2" />
-
-      <Reveal>
-        <div className="notfound-card">
-          {/* Header tab control */}
-          <div className="notfound-terminal-header">
-            <div className="notfound-dots">
-              <span className="notfound-dot red" />
-              <span className="notfound-dot yellow" />
-              <span className="notfound-dot green" />
-            </div>
-            <div className="font-code text-xs text-soft flex items-center gap-1.5">
-              <Terminal size={14} className="text-violet" />
-              <span>sys.error(404)</span>
-            </div>
-          </div>
-
-          {/* Giant error code */}
-          <div className="notfound-huge-text">404</div>
-
-          {/* Text descriptions */}
-          <div className="text-center mb-6">
-            <h3 className="font-display font-bold text-xl text-ink mb-2">
-              Workspace Item Not Found
-            </h3>
-            <p className="font-body text-sm leading-relaxed text-soft max-w-[360px] mx-auto">
-              The path you requested does not exist. It might have been relocated, deleted, or never compiled.
-            </p>
-          </div>
-
-          {/* Interactive code console details */}
-          <div className="bg-panel border border-line rounded-lg p-4 font-code text-xs text-left mb-6 space-y-1 select-none">
-            <div className="flex items-center gap-2">
-              <span className="text-violet">status:</span>
-              <span className="text-soft">RESOLVED_NULL</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-violet">target:</span>
-              <span className="text-soft truncate max-w-[280px]">{window.location.pathname}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-violet">action:</span>
-              <span className="text-soft">cd ~/workspace</span>
-            </div>
-          </div>
-
-          {/* Rollback button */}
-          <button
-            onClick={onBackToHome}
-            className="btn btn-primary w-full flex items-center justify-center gap-2 py-3 cursor-pointer"
+    <div
+      style={{
+        paddingTop: '120px',
+        paddingBottom: '5rem',
+        minHeight: '85vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative'
+      }}
+    >
+      <div className="container" style={{ maxWidth: '480px' }}>
+        <Reveal>
+          <div
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '2.5rem',
+              boxShadow: 'var(--shadow-lg)',
+              textAlign: 'center',
+              position: 'relative'
+            }}
           >
-            <span>~$ cd ~/workspace</span>
-            <ArrowRight size={16} />
-          </button>
-        </div>
-      </Reveal>
+            {/* Top accent */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '3px',
+                background: 'linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))',
+                borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0'
+              }}
+            />
+
+            {/* Error Code */}
+            <div
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: '5rem',
+                fontWeight: 900,
+                lineHeight: 1,
+                letterSpacing: '-0.04em',
+                background: 'var(--grad-hero)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                marginBottom: '0.75rem'
+              }}
+            >
+              404
+            </div>
+
+            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+              Resource Not Located
+            </h3>
+
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', marginBottom: '1.75rem', lineHeight: 1.6 }}>
+              The path requested could not be resolved in the portfolio application tree.
+            </p>
+
+            {/* Console details */}
+            <div
+              style={{
+                background: 'var(--bg-primary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '1rem',
+                fontFamily: 'var(--font-code)',
+                fontSize: '0.76rem',
+                textAlign: 'left',
+                color: 'var(--text-secondary)',
+                marginBottom: '1.5rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.35rem'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-primary)', marginBottom: '0.2rem' }}>
+                <Terminal size={14} />
+                <span>sys.resolution_failure</span>
+              </div>
+              <div>status: 404_NOT_FOUND</div>
+              <div>endpoint: {window.location.pathname}</div>
+              <div>fallback: return ~/workspace</div>
+            </div>
+
+            <button
+              onClick={onBackToHome || (() => onNavigate('/'))}
+              className="btn btn-primary"
+              style={{ width: '100%', padding: '0.85rem' }}
+            >
+              <span>Return to Portfolio</span>
+              <ArrowRight size={16} />
+            </button>
+          </div>
+        </Reveal>
+      </div>
     </div>
   );
 }

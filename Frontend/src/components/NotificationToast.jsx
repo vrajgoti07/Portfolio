@@ -5,23 +5,24 @@ export default function NotificationToast({ type = 'success', message, onClose }
 
   return (
     <div
+      role="alert"
+      aria-live="polite"
       style={{
         display: 'flex',
         alignItems: 'center',
-        justify: 'space-between',
+        justifyContent: 'space-between',
         padding: '0.85rem 1.25rem',
-        borderRadius: '8px',
+        borderRadius: 'var(--radius-md, 10px)',
         marginBottom: '1.5rem',
-        background: isSuccess ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-        border: `1px solid ${isSuccess ? '#10b981' : '#ef4444'}`,
-        color: isSuccess ? '#10b981' : '#ef4444',
-        fontSize: '0.95rem',
-        fontWeight: '500',
-        transition: 'all 0.3s ease',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+        background: isSuccess ? 'rgba(85, 182, 133, 0.12)' : 'rgba(229, 107, 111, 0.12)',
+        border: `1px solid ${isSuccess ? 'var(--color-success, #55B685)' : 'var(--color-error, #E56B6F)'}`,
+        color: isSuccess ? 'var(--color-success, #55B685)' : 'var(--color-error, #E56B6F)',
+        fontSize: '0.92rem',
+        fontWeight: '600',
+        boxShadow: 'var(--shadow-sm)'
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
         <span>{isSuccess ? '✓' : '⚠️'}</span>
         <span>{message}</span>
       </div>
@@ -33,7 +34,7 @@ export default function NotificationToast({ type = 'success', message, onClose }
             border: 'none',
             color: 'inherit',
             cursor: 'pointer',
-            fontSize: '1.2rem',
+            fontSize: '1.25rem',
             lineHeight: 1,
             padding: '0 0.25rem'
           }}

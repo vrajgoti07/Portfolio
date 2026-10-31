@@ -1,131 +1,157 @@
 import { useState, useEffect } from 'react';
-import { stats } from '../data/portfolioData';
-
-// Simple arrow-right SVG
-const ArrowRight = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="5" y1="12" x2="19" y2="12"/>
-    <polyline points="12 5 19 12 12 19"/>
-  </svg>
-);
-
-
-const ROLES = ['Backend Developer', 'Python Developer', 'Database Engineer'];
+import { ArrowRight, Mail, FileText, Sparkles, Terminal, Code2, Cpu, Database } from 'lucide-react';
+import { heroRoles, personalInfo } from '../data/portfolioData';
 
 export default function Hero({ onNavigate }) {
   const [roleIdx, setRoleIdx] = useState(0);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [charIdx, setCharIdx] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // Typewriter effect cycling through roles
+  // Typewriter effect cycling through specified roles
   useEffect(() => {
-    const currentRole = ROLES[roleIdx];
-    let timeout;
+    const currentRole = heroRoles[roleIdx];
+    let timer;
 
     if (!isDeleting && charIdx < currentRole.length) {
-      timeout = setTimeout(() => setCharIdx((c) => c + 1), 75);
+      timer = setTimeout(() => setCharIdx((c) => c + 1), 60);
     } else if (!isDeleting && charIdx === currentRole.length) {
-      timeout = setTimeout(() => setIsDeleting(true), 2000);
+      timer = setTimeout(() => setIsDeleting(true), 2400);
     } else if (isDeleting && charIdx > 0) {
-      timeout = setTimeout(() => setCharIdx((c) => c - 1), 40);
+      timer = setTimeout(() => setCharIdx((c) => c - 1), 35);
     } else if (isDeleting && charIdx === 0) {
-      timeout = setTimeout(() => {
+      timer = setTimeout(() => {
         setIsDeleting(false);
-        setRoleIdx((i) => (i + 1) % ROLES.length);
-      }, 0);
+        setRoleIdx((r) => (r + 1) % heroRoles.length);
+      }, 300);
     }
 
-    return () => clearTimeout(timeout);
+    return () => clearTimeout(timer);
   }, [charIdx, isDeleting, roleIdx]);
 
-  const currentRole = ROLES[roleIdx];
+  const currentRole = heroRoles[roleIdx];
+
 
   return (
-    <section id="home" className="hero">
-      {/* Animated background */}
-      <div className="hero-bg">
-        <div className="hero-orb hero-orb-1" />
-        <div className="hero-orb hero-orb-2" />
-        <div className="hero-orb hero-orb-3" />
-        <div className="hero-grid" />
-      </div>
+    <section id="hero" className="hero">
+      {/* Refined ambient orange glow */}
+      <div className="hero-ambient-glow" aria-hidden="true" />
 
-      <div className="container" style={{ width: '100%' }}>
-        <div className="hero-content">
-          {/* Status badge */}
-          <div className="hero-badge fade-in-up delay-1">
-            <span className="hero-badge-dot" />
-            Available for new opportunities
+      <div className="container">
+        <div className="hero-grid">
+          {/* LEFT SIDE: Typography, Roles & CTAs */}
+          <div className="hero-content-col">
+            {/* Status Badge */}
+            <div className="hero-status-badge">
+              <span className="pulse-radar-dot" aria-hidden="true" />
+              <span>{personalInfo.status}</span>
+            </div>
+
+            {/* Intro text */}
+            <span className="hero-intro-text">
+              Hi, I'm {personalInfo.name}
+            </span>
+
+            {/* Main Heading */}
+            <h1 className="hero-main-title">
+              Building <span className="gradient-text">Intelligent</span><br />
+              Digital Experiences.
+            </h1>
+
+            {/* Dynamic Typewriter Role */}
+            <div className="hero-dynamic-role" aria-live="polite">
+              <Terminal size={20} color="var(--accent-secondary)" style={{ marginRight: '0.65rem' }} />
+              <span>{currentRole.slice(0, charIdx)}</span>
+              <span className="typing-cursor" aria-hidden="true" />
+            </div>
+
+            {/* Professional Summary */}
+            <p className="hero-summary">
+              {personalInfo.bio} Focused on engineering scalable systems with clean architecture,
+              responsive design, and verifiable performance.
+            </p>
+
+            {/* CTA Buttons */}
+            <div className="hero-actions">
+              <button
+                id="hero-explore-work"
+                className="btn btn-primary"
+                onClick={() => onNavigate('/projects')}
+              >
+                <span>Explore My Work</span>
+                <ArrowRight size={16} />
+              </button>
+
+              <button
+                id="hero-connect-btn"
+                className="btn btn-secondary"
+                onClick={() => onNavigate('/contact')}
+              >
+                <Mail size={16} />
+                <span>Let's Connect</span>
+              </button>
+
+              <button
+                id="hero-resume-link"
+                onClick={() => onNavigate('/about')}
+                className="btn btn-ghost"
+                title="View Technical Background & Journey"
+              >
+                <FileText size={16} />
+                <span>About &amp; Journey</span>
+              </button>
+            </div>
           </div>
 
-          {/* Title */}
-          <h1 className="hero-title fade-in-up delay-2">
-            <span style={{ color: 'var(--text-secondary)', fontWeight: 300, fontSize: '0.55em', letterSpacing: '0.01em', marginBottom: '0.25rem', fontFamily: 'var(--font-code)' }}>
-              Hi, I'm
-            </span>
-            <span>Vraj Goti</span>
-            <span
-              className="gradient-text"
-              style={{ fontSize: '0.7em', fontWeight: 800, letterSpacing: '-0.02em' }}
-            >
-              {currentRole.slice(0, charIdx)}
-              <span
-                style={{
-                  display: 'inline-block',
-                  width: '3px',
-                  height: '0.8em',
-                  background: 'var(--accent-primary)',
-                  marginLeft: '3px',
-                  verticalAlign: 'middle',
-                  borderRadius: '2px',
-                  animation: 'heartbeat 0.8s step-start infinite',
-                }}
-              />
-            </span>
-          </h1>
+          {/* RIGHT SIDE: Elegant Interactive Profile Composition */}
+          <div className="hero-visual-col">
+            <div className="hero-visual-card">
+              {/* Technical orbit visualization */}
+              <div className="orbit-circle-outer">
+                <div className="orbit-circle-inner">
+                  <div className="hero-monogram-emblem">VG</div>
+                </div>
 
-          {/* Bio */}
-          <p className="hero-subtitle fade-in-up delay-3">
-            I build high-throughput backend APIs, scalable distributed databases, and custom Python tooling. 
-            Passionate about clean architecture, system performance, and elegant database optimization.
-          </p>
-
-          {/* Actions */}
-          <div className="hero-actions fade-in-up delay-4">
-            <button
-              id="hero-view-work"
-              className="btn btn-primary"
-              onClick={() => onNavigate('/projects')}
-            >
-              View My Work <ArrowRight />
-            </button>
-            <button
-              id="hero-contact"
-              className="btn btn-ghost"
-              onClick={() => onNavigate('/contact')}
-            >
-              Get In Touch
-            </button>
-          </div>
-
-          {/* Stats */}
-          <div className="hero-stats fade-in-up delay-5">
-            {stats.map((stat, i) => (
-              <div key={i}>
-                <span className="hero-stat-value">{stat.value}</span>
-                <span className="hero-stat-label">{stat.label}</span>
+                {/* Floating technology badges */}
+                <div className="floating-tech-badge tech-pos-1">
+                  <Code2 size={13} style={{ color: 'var(--accent-primary)', display: 'inline', marginRight: '4px' }} />
+                  Python 3.12
+                </div>
+                <div className="floating-tech-badge tech-pos-2">
+                  <Sparkles size={13} style={{ color: 'var(--accent-secondary)', display: 'inline', marginRight: '4px' }} />
+                  AI & ML
+                </div>
+                <div className="floating-tech-badge tech-pos-3">
+                  <Cpu size={13} style={{ color: 'var(--accent-primary)', display: 'inline', marginRight: '4px' }} />
+                  React 19
+                </div>
+                <div className="floating-tech-badge tech-pos-4">
+                  <Database size={13} style={{ color: 'var(--accent-secondary)', display: 'inline', marginRight: '4px' }} />
+                  Node.js / Mongo
+                </div>
               </div>
-            ))}
+
+              {/* Technical specifications panel */}
+              <div className="hero-spec-grid">
+                <div className="spec-item">
+                  <span className="spec-label">Specialization</span>
+                  <span className="spec-value">Full-Stack & AI</span>
+                </div>
+                <div className="spec-item">
+                  <span className="spec-label">Core Runtime</span>
+                  <span className="spec-value">Python / Node.js</span>
+                </div>
+                <div className="spec-item">
+                  <span className="spec-label">Architecture</span>
+                  <span className="spec-value">Event-Driven / RBAC</span>
+                </div>
+                <div className="spec-item">
+                  <span className="spec-label">Database</span>
+                  <span className="spec-value">MongoDB / Caching</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Scroll indicator */}
-      <div className="scroll-indicator">
-        <div className="scroll-mouse">
-          <div className="scroll-wheel" />
-        </div>
-        <span>scroll</span>
       </div>
     </section>
   );

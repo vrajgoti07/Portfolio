@@ -17,12 +17,17 @@ const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
 const ContactPage = lazy(() => import('./pages/ContactPage'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const TaskPage = lazy(() => import('./pages/TaskPage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const ExperiencePage = lazy(() => import('./pages/ExperiencePage'));
 
-// Stable navigation configuration to prevent unnecessary Navbar re-renders
+// Stable navigation configuration
 const NAV_ITEMS = [
   { label: 'Home', path: '/' },
-  { label: 'Tasks', path: '/tasks' },
+  { label: 'About', path: '/about' },
+  { label: 'Skills', path: '/skills' },
   { label: 'Projects', path: '/projects' },
+  { label: 'Experience', path: '/experience' },
+  { label: 'Tasks', path: '/tasks' },
   { label: 'Contact', path: '/contact' },
 ];
 
@@ -147,11 +152,14 @@ export default function App() {
       case '/index.html':
       case '/home':
         return <Home onNavigate={handleNavigate} />;
+      case '/about':
+        return <AboutPage onNavigate={handleNavigate} />;
+      case '/experience':
+        return <ExperiencePage />;
       case '/projects':
         return <ProjectsPage onNavigate={handleNavigate} />;
       case '/task':
       case '/tasks':
-        // Crucial requirement: Tasks page strictly renders task details and never redirects or shows login!
         return <TaskPage onNavigate={handleNavigate} user={user} onLogout={handleLogout} />;
       case '/admin':
         return <AdminDashboard onNavigate={handleNavigate} />;
@@ -172,7 +180,7 @@ export default function App() {
 
   return (
     <>
-      {/* Isolated scroll progress bar to avoid App-level re-renders */}
+      {/* Isolated scroll progress bar */}
       <ScrollProgress />
 
       {/* Global Notification Toast */}
@@ -192,13 +200,12 @@ export default function App() {
         setMobileOpen={setMobileOpen}
         theme={theme}
         onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-        navItems={NAV_ITEMS}
         user={user}
         isAuthenticated={Boolean(token)}
         onLogout={handleLogout}
       />
 
-      {/* Mobile menu */}
+      {/* Mobile menu drawer */}
       <div className={`mobile-menu ${mobileOpen ? 'open' : ''}`}>
         {NAV_ITEMS.map((item) => (
           <button
@@ -207,16 +214,13 @@ export default function App() {
             onClick={() => handleNavigate(item.path)}
           >
             <span>{item.label}</span>
-            {item.badge && (
-              <span className="nav-item-badge">{item.badge}</span>
-            )}
           </button>
         ))}
 
         {isAdmin && (
           <button
             className="mobile-nav-link"
-            style={{ color: 'var(--color-warning, #F59E0B)', fontWeight: 700 }}
+            style={{ color: 'var(--accent-secondary, #E9A23B)', fontWeight: 700 }}
             onClick={() => handleNavigate('/admin')}
           >
             <span>👑 Admin Dashboard</span>
@@ -226,13 +230,13 @@ export default function App() {
         {token ? (
           <button
             className="mobile-nav-link"
-            style={{ color: 'var(--color-danger, #EF4444)' }}
+            style={{ color: 'var(--color-error, #E56B6F)' }}
             onClick={handleLogout}
           >
             <span>Logout ({user?.email || 'User'})</span>
           </button>
         ) : (
-          <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
             <button
               className="mobile-nav-link"
               onClick={() => handleNavigate('/login')}
@@ -240,12 +244,13 @@ export default function App() {
               <span>Login</span>
             </button>
             <button
-              className="mobile-nav-link"
+              className="btn btn-primary"
+              style={{ width: '100%', padding: '0.8rem' }}
               onClick={() => handleNavigate('/register')}
             >
               <span>Register</span>
             </button>
-          </>
+          </div>
         )}
       </div>
 
@@ -256,7 +261,7 @@ export default function App() {
         </Suspense>
       </main>
 
-      <Footer />
+      <Footer onNavigate={handleNavigate} />
     </>
   );
 }

@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import Reveal from '../components/Reveal';
-import Spinner from '../components/Spinner';
-import ErrorMessage from '../components/ErrorMessage';
 import NotificationToast from '../components/NotificationToast';
 import { loginUser } from '../api';
+import { Eye, EyeOff, Lock, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
 
 export default function LoginPage({ onNavigate, onLoginSuccess }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notification, setNotification] = useState(null);
@@ -34,7 +34,7 @@ export default function LoginPage({ onNavigate, onLoginSuccess }) {
       setNotification({
         type: 'success',
         message: isAdmin
-          ? 'Admin authentication verified! Loading Executive Dashboard...'
+          ? 'Admin credentials verified. Redirecting to Executive Dashboard...'
           : 'Sign in successful! Redirecting to tasks...'
       });
 
@@ -68,159 +68,213 @@ export default function LoginPage({ onNavigate, onLoginSuccess }) {
         position: 'relative'
       }}
     >
-      {notification && (
-        <NotificationToast
-          type={notification.type}
-          message={notification.message}
-          onClose={() => setNotification(null)}
-        />
-      )}
+      <div className="container" style={{ maxWidth: '480px' }}>
+        {notification && (
+          <NotificationToast
+            type={notification.type}
+            message={notification.message}
+            onClose={() => setNotification(null)}
+          />
+        )}
 
-      <div style={{ width: '100%', maxWidth: '460px', margin: '0 auto', padding: '0 1.25rem' }}>
         <Reveal>
-          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <span
+          <div
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '2.5rem',
+              boxShadow: 'var(--shadow-lg)',
+              position: 'relative'
+            }}
+          >
+            {/* Top accent line */}
+            <div
               style={{
-                fontFamily: 'var(--font-code)',
-                fontSize: '0.8rem',
-                color: 'var(--accent-secondary)',
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase'
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '3px',
+                background: 'linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))',
+                borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0'
               }}
-            >
-              Account Authentication
-            </span>
-            <h1
-              style={{
-                fontSize: '2.2rem',
-                fontWeight: 800,
-                marginTop: '0.4rem',
-                marginBottom: '0.6rem',
-                background: 'var(--grad-text)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent'
-              }}
-            >
-              Sign In
-            </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-              Access your assigned tasks or executive management portal
-            </p>
-          </div>
-        </Reveal>
+            />
 
-        <Reveal delay={100}>
-          <div className="task-form-card" style={{ padding: '2rem', backdropFilter: 'blur(16px)' }}>
+            {/* Header */}
+            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+              <div
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'rgba(255, 107, 53, 0.1)',
+                  border: '1px solid rgba(255, 107, 53, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 1rem auto',
+                  color: 'var(--accent-primary)'
+                }}
+              >
+                <Lock size={22} />
+              </div>
+
+              <span
+                style={{
+                  fontFamily: 'var(--font-code)',
+                  fontSize: '0.75rem',
+                  color: 'var(--accent-secondary)',
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase'
+                }}
+              >
+                RBAC Access Control
+              </span>
+              <h1 style={{ fontSize: '1.9rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.35rem', marginBottom: '0.4rem' }}>
+                Sign In to Platform
+              </h1>
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                Access your task management workspace and administrative controls.
+              </p>
+            </div>
+
             {error && (
-              <div style={{ marginBottom: '1.5rem' }}>
-                <ErrorMessage message={error} onDismiss={() => setError('')} />
+              <div
+                role="alert"
+                style={{
+                  background: 'rgba(229, 107, 111, 0.12)',
+                  border: '1px solid var(--color-error)',
+                  color: 'var(--color-error)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '0.75rem 1rem',
+                  fontSize: '0.88rem',
+                  marginBottom: '1.25rem',
+                  fontWeight: 500
+                }}
+              >
+                ⚠️ {error}
               </div>
             )}
 
-            <form onSubmit={handleSubmit}>
-              <div className="task-form-group">
-                <label htmlFor="login-email" className="task-label">
-                  Email Address <span style={{ color: 'var(--accent-tertiary)' }}>*</span>
+            <form onSubmit={handleSubmit} noValidate>
+              <div className="form-group">
+                <label htmlFor="login-email" className="form-label">
+                  Email Address *
                 </label>
-                <input
-                  id="login-email"
-                  type="email"
-                  className="task-input"
-                  placeholder="Enter email address..."
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                  required
-                />
+                <div style={{ position: 'relative' }}>
+                  <Mail
+                    size={16}
+                    color="var(--text-muted)"
+                    style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+                  />
+                  <input
+                    id="login-email"
+                    type="email"
+                    required
+                    placeholder="vrajgoti07@gmail.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="form-input"
+                    style={{ paddingLeft: '38px' }}
+                    autoComplete="email"
+                  />
+                </div>
               </div>
 
-              <div className="task-form-group">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label htmlFor="login-password" className="task-label" style={{ margin: 0 }}>
-                    Password <span style={{ color: 'var(--accent-tertiary)' }}>*</span>
+              <div className="form-group">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
+                  <label htmlFor="login-password" className="form-label" style={{ margin: 0 }}>
+                    Password *
                   </label>
                   <button
                     type="button"
-                    id="forgot-password-link"
                     onClick={() => onNavigate('/forgot-password')}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--accent-secondary)',
-                      fontSize: '0.82rem',
-                      cursor: 'pointer',
-                      textDecoration: 'underline'
-                    }}
+                    style={{ fontSize: '0.8rem', color: 'var(--accent-primary)', fontWeight: 500 }}
                   >
-                    Forgot Password?
+                    Forgot password?
                   </button>
                 </div>
-                <input
-                  id="login-password"
-                  type="password"
-                  className="task-input"
-                  placeholder="Enter password..."
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                  style={{ marginTop: '0.4rem' }}
-                  required
-                />
+
+                <div style={{ position: 'relative' }}>
+                  <Lock
+                    size={16}
+                    color="var(--text-muted)"
+                    style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+                  />
+                  <input
+                    id="login-password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="form-input"
+                    style={{ paddingLeft: '38px', paddingRight: '40px' }}
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: 'var(--text-muted)',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
 
               <button
                 id="login-submit-btn"
                 type="submit"
-                className="btn-primary"
                 disabled={loading}
-                style={{
-                  width: '100%',
-                  marginTop: '1.25rem',
-                  padding: '0.85rem',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.95rem',
-                  fontWeight: 600
-                }}
+                className="btn btn-primary"
+                style={{ width: '100%', marginTop: '0.75rem', padding: '0.85rem' }}
               >
                 {loading ? (
-                  <>
-                    <Spinner size="sm" />
-                    <span>Authenticating...</span>
-                  </>
+                  <span>Authenticating...</span>
                 ) : (
-                  <span>Sign In</span>
+                  <>
+                    <span>Sign In</span>
+                    <ArrowRight size={16} />
+                  </>
                 )}
               </button>
             </form>
 
+            {/* Quick Demo Hint */}
             <div
               style={{
-                marginTop: '1.75rem',
+                marginTop: '1.5rem',
                 paddingTop: '1.25rem',
-                borderTop: '1px solid var(--border-card)',
+                borderTop: '1px solid var(--border-color)',
                 textAlign: 'center',
-                fontSize: '0.88rem',
+                fontSize: '0.82rem',
                 color: 'var(--text-secondary)'
               }}
             >
-              Don't have an account?{' '}
-              <button
-                id="to-register-link"
-                onClick={() => onNavigate('/register')}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--accent-secondary)',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  textDecoration: 'underline'
-                }}
-              >
-                Register here
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginBottom: '0.4rem', color: 'var(--accent-secondary)' }}>
+                <ShieldCheck size={14} />
+                <span style={{ fontWeight: 600 }}>Admin Account:</span>
+                <code>vrajgoti07@gmail.com</code>
+              </div>
+              <p style={{ margin: 0 }}>
+                Don't have an account?{' '}
+                <button
+                  onClick={() => onNavigate('/register')}
+                  style={{ color: 'var(--accent-primary)', fontWeight: 600 }}
+                >
+                  Create Account
+                </button>
+              </p>
             </div>
           </div>
         </Reveal>
