@@ -35,8 +35,10 @@ services:
     environment:
       - PORT=5000
       - MONGO_URI=mongodb://mongodb:27017/awdf_db
-      - JWT_SECRET=awdf_practical11_jwt_secret_key_secure_2026_super_key
+      - JWT_SECRET=${JWT_SECRET}
       - NODE_ENV=production
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - SMTP_SECURE=false
     depends_on:
       mongodb:

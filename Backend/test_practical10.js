@@ -53,8 +53,14 @@ async function runPractical10TestSuite() {
   let authToken = null;
   let createdTaskId = null;
 
-  // Step 0: Authenticate as Admin (vrajgoti07@gmail.com / 123456789)
-  console.log("[STEP 0] Authenticating as Admin to acquire JWT Bearer token...");
+  // Step 0: Authenticate as Admin
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPass = process.env.ADMIN_PASSWORD;
+  if (!adminEmail || !adminPass) {
+    console.error("[ERROR] ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required.");
+    process.exit(1);
+  }
+  console.log(`[STEP 0] Authenticating as Admin (${adminEmail}) to acquire JWT Bearer token...`);
   try {
     const loginRes = await makeRequest(
       {
@@ -64,7 +70,7 @@ async function runPractical10TestSuite() {
         method: "POST",
         headers: { "Content-Type": "application/json" }
       },
-      { email: "vrajgoti07@gmail.com", password: "123456789" }
+      { email: adminEmail, password: adminPass }
     );
 
     if (loginRes.status === 200 && loginRes.data.token) {

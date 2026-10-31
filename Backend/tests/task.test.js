@@ -4,7 +4,10 @@ const app = require("../app");
 const taskCache = require("../config/cache");
 
 describe("Task Management API Automated Test Suite", () => {
-  const jwtSecret = process.env.JWT_SECRET || "default_secret_key";
+  if (!process.env.JWT_SECRET) {
+    process.env.JWT_SECRET = "test_jwt_secret_key_for_automated_testing_only";
+  }
+  const jwtSecret = process.env.JWT_SECRET;
   const validToken = jwt.sign(
     { id: "test-user-id", email: "tester@example.com", role: "user" },
     jwtSecret,

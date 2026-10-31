@@ -1,0 +1,47 @@
+#! backend-deployment.yaml
+# Generated code, do not edit
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: backend
+    namespace: awdf
+    labels:
+        com.docker.compose.project: awdf
+        com.docker.compose.service: backend
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            com.docker.compose.project: awdf
+            com.docker.compose.service: backend
+    strategy:
+        type: Recreate
+    template:
+        metadata:
+            labels:
+                com.docker.compose.project: awdf
+                com.docker.compose.service: backend
+                com.docker.compose.network.app-network: "true"
+        spec:
+            restartPolicy: unless-stopped
+            containers:
+                - name: awdf-backend
+                  image: awdf-backend
+                  imagePullPolicy: IfNotPresent
+                  env:
+                    - name: JWT_SECRET
+                      valueFrom:
+                        secretKeyRef:
+                          name: awdf-secrets
+                          key: JWT_SECRET
+                    - name: MONGO_URI
+                      value: "mongodb://mongodb:27017/awdf_db"
+                    - name: NODE_ENV
+                      value: "production"
+                    - name: PORT
+                      value: "5000"
+                    - name: SMTP_SECURE
+                      value: "false"
+                  ports:
+                    - name: backend-5000
+                      containerPort: 5000

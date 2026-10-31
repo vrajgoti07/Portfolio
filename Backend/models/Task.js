@@ -34,7 +34,7 @@ const taskSchema = new mongoose.Schema(
     },
     assignedBy: {
       type: String,
-      default: "vrajgoti07@gmail.com",
+      default: "admin",
       trim: true
     },
     evaluationVerdict: {

@@ -1,9 +1,17 @@
+const path = require("path");
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
+require("dotenv").config({ path: path.resolve(__dirname, ".env") });
+require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
+
+// Require JWT_SECRET through environment variables
+if (!process.env.JWT_SECRET && process.env.NODE_ENV !== "test") {
+  throw new Error("FATAL: JWT_SECRET environment variable is required.");
+}
 
 const Task = require("./models/Task");
 const User = require("./models/User");
@@ -19,7 +27,7 @@ const { registerTaskListeners } = require("./listeners");
 // Register domain event listeners once at server initialization
 registerTaskListeners();
 
-// In-memory fallback repository for tasks (guarantees offline/unwhitelisted testing continuity)
+// In-memory task repository exclusively for isolated unit tests (NODE_ENV === 'test')
 const inMemoryTasks = [];
 
 const app = express();
@@ -46,7 +54,6 @@ app.get("/", (req, res) => {
   res.status(200).json({
     status: "success",
     message: "Task Manager API with Role-Based Access Control (RBAC) & SMTP Email Service Active",
-    admin: "vrajgoti07@gmail.com",
     smtp: {
       protocol: "SMTP",
       configured: emailService.isSmtpConfigured()
@@ -66,12 +73,11 @@ app.get("/smtp/status", async (req, res) => {
       host: process.env.SMTP_HOST || "smtp.gmail.com",
       port: parseInt(process.env.SMTP_PORT || "587", 10),
       secure: process.env.SMTP_SECURE === "true",
-      user: process.env.SMTP_USER || "vrajgoti07@gmail.com",
       configured: emailService.isSmtpConfigured(),
       ...result
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Failed to verify SMTP service" });
   }
 });
 
@@ -123,8 +129,9 @@ app.post("/register", async (req, res) => {
     // Hash password with bcrypt (10 rounds)
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Only vrajgoti07@gmail.com can be admin; all other registrations default to user
-    const role = normalizedEmail === "vrajgoti07@gmail.com" ? "admin" : "user";
+    // All public user registrations strictly default to standard "user" role.
+    // Administrative privileges cannot be acquired via registration.
+    const role = "user";
 
     const newUser = new User({
       name: name ? name.trim() : normalizedEmail.split("@")[0],
@@ -171,20 +178,14 @@ app.post("/login", async (req, res) => {
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Find user by email (from MongoDB or offline admin fallback)
-    let user = null;
-    if (mongoose.connection.readyState === 1) {
-      user = await User.findOne({ email: normalizedEmail });
-    } else if (normalizedEmail === "vrajgoti07@gmail.com" && password === "123456789") {
-      user = {
-        _id: new mongoose.Types.ObjectId("660000000000000000000001"),
-        name: "Vraj Goti (Admin)",
-        email: "vrajgoti07@gmail.com",
-        password: await bcrypt.hash("123456789", 10),
-        role: "admin"
-      };
+    // Ensure database connection is active; offline fallbacks are strictly prohibited
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({
+        message: "Database service unavailable. MongoDB connection is offline."
+      });
     }
 
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
@@ -195,13 +196,18 @@ app.post("/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Ensure role integrity
-    const role = normalizedEmail === "vrajgoti07@gmail.com" ? "admin" : (user.role || "user");
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({
+        message: "Server configuration error: JWT_SECRET is not configured"
+      });
+    }
+
+    const role = user.role || "user";
 
     // Generate JWT token with ~24 hour expiry
     const token = jwt.sign(
       { id: user._id, email: user.email, role },
-      process.env.JWT_SECRET || "default_secret_key",
+      process.env.JWT_SECRET,
       { expiresIn: "24h" }
     );
 
@@ -275,7 +281,7 @@ app.get("/me", authMiddleware, async (req, res) => {
       _id: user._id,
       email: user.email,
       name: user.name || user.email.split("@")[0],
-      role: user.email === "vrajgoti07@gmail.com" ? "admin" : (user.role || "user"),
+      role: user.role || "user",
       createdAt: user.createdAt
     });
   } catch (error) {
@@ -287,7 +293,7 @@ app.get("/me", authMiddleware, async (req, res) => {
 });
 
 // ==========================================
-// Admin Dedicated Routes (Admin Only: vrajgoti07@gmail.com)
+// Admin Dedicated Routes (Admin Role Only)
 // ==========================================
 
 // GET /admin/users - Get registered users list and workload for task assignment
@@ -354,7 +360,7 @@ app.post("/admin/tasks", authMiddleware, adminMiddleware, async (req, res) => {
       priority: priority && ["Low", "Medium", "High", "Urgent"].includes(priority) ? priority : "Medium",
       assignedTo: assignedEmail,
       assignedToName: targetUser?.name || assignedEmail.split("@")[0],
-      assignedBy: "vrajgoti07@gmail.com",
+      assignedBy: req.user?.email || "admin",
       evaluationVerdict: "Pending Evaluation",
       completed: false
     });
@@ -362,9 +368,13 @@ app.post("/admin/tasks", authMiddleware, adminMiddleware, async (req, res) => {
     let savedTask;
     if (mongoose.connection.readyState === 1) {
       savedTask = await newTask.save();
-    } else {
+    } else if (process.env.NODE_ENV === "test") {
       savedTask = newTask;
       inMemoryTasks.push(savedTask);
+    } else {
+      return res.status(503).json({
+        message: "Database service unavailable. MongoDB connection is required."
+      });
     }
 
     // Cache Invalidation (Practical 9): Invalidate task collections after DB write
@@ -495,8 +505,12 @@ app.get("/tasks", optionalAuth, async (req, res) => {
     let tasks;
     if (mongoose.connection.readyState === 1) {
       tasks = await Task.find(filter).sort({ createdAt: -1 });
-    } else {
+    } else if (process.env.NODE_ENV === "test") {
       tasks = [...inMemoryTasks];
+    } else {
+      return res.status(503).json({
+        message: "Database service unavailable. MongoDB connection is required."
+      });
     }
 
     // Step 3: Store result in cache (even if empty, preserving valid empty states)
@@ -531,12 +545,18 @@ app.get("/tasks/:id", optionalAuth, async (req, res) => {
     }
 
     // Step 2: CACHE MISS: Query MongoDB
+    res.setHeader("X-Cache", "MISS");
     let task;
     if (mongoose.connection.readyState === 1) {
       task = await Task.findById(id);
-    } else {
+    } else if (process.env.NODE_ENV === "test") {
       task = inMemoryTasks.find((t) => t._id.toString() === id.toString());
+    } else {
+      return res.status(503).json({
+        message: "Database service unavailable. MongoDB connection is required."
+      });
     }
+
     if (!task) {
       // Do NOT cache 404 not-found errors
       return res.status(404).json({ message: "Task not found" });
@@ -569,16 +589,20 @@ app.post("/tasks", authMiddleware, validateTask, async (req, res) => {
       status: taskStatus,
       priority: priority || "Medium",
       assignedTo: assignedTo || req.user?.email || "",
-      assignedBy: req.user?.role === "admin" ? "vrajgoti07@gmail.com" : req.user?.email,
+      assignedBy: req.user?.email || "user",
       completed: taskStatus === "Completed"
     });
 
     let savedTask;
     if (mongoose.connection.readyState === 1) {
       savedTask = await newTask.save();
-    } else {
+    } else if (process.env.NODE_ENV === "test") {
       savedTask = newTask;
       inMemoryTasks.push(savedTask);
+    } else {
+      return res.status(503).json({
+        message: "Database service unavailable. MongoDB connection is required."
+      });
     }
 
     // Cache Invalidation (Practical 9): Invalidate task collections after DB write
@@ -622,12 +646,24 @@ app.put("/tasks/:id", authMiddleware, validateTask, async (req, res) => {
       return res.status(400).json({ message: "Invalid Task ID format" });
     }
 
-    const existingTask = await Task.findById(id);
+    if (mongoose.connection.readyState !== 1 && process.env.NODE_ENV !== "test") {
+      return res.status(503).json({
+        message: "Database service unavailable. MongoDB connection is required."
+      });
+    }
+
+    let existingTask;
+    if (mongoose.connection.readyState === 1) {
+      existingTask = await Task.findById(id);
+    } else if (process.env.NODE_ENV === "test") {
+      existingTask = inMemoryTasks.find((t) => t._id.toString() === id.toString());
+    }
+
     if (!existingTask) {
       return res.status(404).json({ message: "Task not found" });
     }
 
-    const isAdmin = req.user?.role === "admin" || req.user?.email === "vrajgoti07@gmail.com";
+    const isAdmin = req.user?.role === "admin";
     const isOngoingOrCompleted = existingTask.status === "Ongoing" || existingTask.status === "Completed" || existingTask.status === "In Progress";
 
     // Enforce strict edit locking rule
@@ -662,7 +698,12 @@ app.put("/tasks/:id", authMiddleware, validateTask, async (req, res) => {
       existingTask.completed = nextStatus === "Completed";
     }
 
-    const updatedTask = await existingTask.save();
+    let updatedTask;
+    if (mongoose.connection.readyState === 1) {
+      updatedTask = await existingTask.save();
+    } else {
+      updatedTask = existingTask;
+    }
 
     // Cache Invalidation (Practical 9): Invalidate single task and task collections
     taskCache.invalidateTask(id);
@@ -691,15 +732,19 @@ app.delete("/tasks/:id", authMiddleware, async (req, res) => {
     let existingTask;
     if (mongoose.connection.readyState === 1) {
       existingTask = await Task.findById(id);
-    } else {
+    } else if (process.env.NODE_ENV === "test") {
       existingTask = inMemoryTasks.find((t) => t._id.toString() === id.toString());
+    } else {
+      return res.status(503).json({
+        message: "Database service unavailable. MongoDB connection is required."
+      });
     }
 
     if (!existingTask) {
       return res.status(404).json({ message: "Task not found" });
     }
 
-    const isAdmin = req.user?.role === "admin" || req.user?.email === "vrajgoti07@gmail.com";
+    const isAdmin = req.user?.role === "admin";
     const isOngoingOrCompleted = existingTask.status === "Ongoing" || existingTask.status === "Completed" || existingTask.status === "In Progress";
 
     // Non-admin users cannot delete tasks once they have left Pending status
@@ -712,11 +757,15 @@ app.delete("/tasks/:id", authMiddleware, async (req, res) => {
     let deletedTask;
     if (mongoose.connection.readyState === 1) {
       deletedTask = await Task.findByIdAndDelete(id);
-    } else {
+    } else if (process.env.NODE_ENV === "test") {
       const idx = inMemoryTasks.findIndex((t) => t._id.toString() === id.toString());
       if (idx !== -1) {
         deletedTask = inMemoryTasks.splice(idx, 1)[0];
       }
+    } else {
+      return res.status(503).json({
+        message: "Database service unavailable. MongoDB connection is required."
+      });
     }
 
     // Cache Invalidation (Practical 9): Invalidate single task and task collections

@@ -19,8 +19,14 @@ module.exports = function optionalAuth(req, res, next) {
   }
 
   const token = parts[1];
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) {
+    req.user = null;
+    return next();
+  }
+
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "default_secret_key");
+    const decoded = jwt.verify(token, jwtSecret);
     req.user = decoded;
   } catch (err) {
     req.user = null;

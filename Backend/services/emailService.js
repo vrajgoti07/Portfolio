@@ -8,7 +8,7 @@ const createSmtpTransporter = () => {
   const host = process.env.SMTP_HOST || "smtp.gmail.com";
   const port = parseInt(process.env.SMTP_PORT || "587", 10);
   const secure = process.env.SMTP_SECURE === "true" || port === 465;
-  const user = process.env.SMTP_USER || "vrajgoti07@gmail.com";
+  const user = process.env.SMTP_USER || "";
   const pass = process.env.SMTP_PASS || "";
 
   // Transporter options configured with SMTP protocol specifications
@@ -41,11 +41,11 @@ const isSmtpConfigured = () => {
  * Core SMTP Mail Sender
  */
 async function sendMail({ to, subject, html, text }) {
-  const from = process.env.FROM_EMAIL || `Task Manager <${process.env.SMTP_USER || "vrajgoti07@gmail.com"}>`;
+  const from = process.env.FROM_EMAIL || (process.env.SMTP_USER ? `Task Manager <${process.env.SMTP_USER}>` : "Task Manager <noreply@taskmanager.local>");
 
   if (!isSmtpConfigured()) {
     console.log(`[SMTP SIMULATED] To: ${to} | Subject: "${subject}"`);
-    console.log(`[SMTP NOTICE] To send real emails, set your 16-character Google App Password in Backend/.env (SMTP_PASS=xxxx)`);
+    console.log(`[SMTP NOTICE] To send real emails, configure your SMTP credentials in environment`);
     return {
       success: true,
       simulated: true,
@@ -86,7 +86,7 @@ async function sendWelcomeEmail(toEmail, userName = "") {
       </p>
       <div style="background: #f7fafc; padding: 15px; border-radius: 6px; margin: 20px 0;">
         <p style="margin: 0; color: #2d3748;"><strong>Registered Email:</strong> ${toEmail}</p>
-        <p style="margin: 5px 0 0 0; color: #2d3748;"><strong>Assigned Administrator:</strong> vrajgoti07@gmail.com</p>
+        <p style="margin: 5px 0 0 0; color: #2d3748;"><strong>Assigned Administrator:</strong> ${process.env.ADMIN_EMAIL || "Platform Admin"}</p>
       </div>
       <p style="color: #4a5568; line-height: 1.6;">
         You can sign in to view any tasks assigned to you by the admin and advance your deliverables through the workflow.
@@ -108,7 +108,7 @@ async function sendTaskAssignmentEmail(toEmail, task) {
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
       <h2 style="color: #00D4FF; margin-top: 0;">New Task Assigned</h2>
       <p style="color: #4a5568; line-height: 1.6;">
-        Administrator <strong>vrajgoti07@gmail.com</strong> has assigned a new task to you:
+        Administrator <strong>${task.assignedBy || process.env.ADMIN_EMAIL || "Admin"}</strong> has assigned a new task to you:
       </p>
       <div style="background: #f0fdf4; border-left: 4px solid #10B981; padding: 15px; margin: 20px 0; border-radius: 4px;">
         <h3 style="margin: 0 0 8px 0; color: #1e293b;">${task.title}</h3>
@@ -124,7 +124,7 @@ async function sendTaskAssignmentEmail(toEmail, task) {
         Please review the task details. You may edit pending requirements or begin work by advancing to <strong>Ongoing</strong>.
       </p>
       <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid #edf2f7; font-size: 0.85em; color: #a0aec0;">
-        Sent via SMTP protocol (nodemailer) from vrajgoti07@gmail.com
+        Sent via SMTP protocol (nodemailer) from ${task.assignedBy || process.env.ADMIN_EMAIL || "Admin"}
       </div>
     </div>
   `;
@@ -135,12 +135,13 @@ async function sendTaskAssignmentEmail(toEmail, task) {
  * 3. Task Deliverable Evaluated Notification Email
  */
 async function sendTaskEvaluationEmail(toEmail, task) {
+  const adminContact = task.assignedBy || process.env.ADMIN_EMAIL || "Admin";
   const subject = `Deliverable Evaluated: ${task.title}`;
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
       <h2 style="color: #10B981; margin-top: 0;">Task Evaluation Completed</h2>
       <p style="color: #4a5568; line-height: 1.6;">
-        Admin <strong>vrajgoti07@gmail.com</strong> has reviewed and evaluated your deliverable:
+        Admin <strong>${adminContact}</strong> has reviewed and evaluated your deliverable:
       </p>
       <div style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 15px; margin: 20px 0; border-radius: 6px;">
         <h3 style="margin: 0 0 10px 0; color: #0f172a;">${task.title}</h3>
@@ -170,7 +171,7 @@ async function sendPasswordResetSuccessEmail(toEmail) {
         This email confirms that the password for your account <strong>${toEmail}</strong> was recently changed.
       </p>
       <p style="color: #4a5568; line-height: 1.6;">
-        If you performed this action, you can safely ignore this email. If you did not make this change, please contact the administrator (vrajgoti07@gmail.com) immediately.
+        If you performed this action, you can safely ignore this email. If you did not make this change, please contact the administrator (${process.env.ADMIN_EMAIL || "support"}) immediately.
       </p>
       <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid #edf2f7; font-size: 0.85em; color: #a0aec0;">
         Security notice sent via SMTP protocol • Task Management System
@@ -187,7 +188,7 @@ async function verifySmtpConnection() {
   if (!isSmtpConfigured()) {
     return {
       connected: false,
-      message: "SMTP is in simulated mode. Set SMTP_PASS in .env to connect to live SMTP server."
+      message: "SMTP is in simulated mode. Configure SMTP credentials in environment to connect to live SMTP server."
     };
   }
   try {

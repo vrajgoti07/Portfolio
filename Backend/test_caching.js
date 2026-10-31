@@ -38,14 +38,20 @@ async function runTestSuite() {
   let testTaskId = null;
 
   // Step 0: Login as admin to get auth token for write ops
-  console.log('[STEP 0] Authenticating as Admin (vrajgoti07@gmail.com)...');
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPass = process.env.ADMIN_PASSWORD;
+  if (!adminEmail || !adminPass) {
+    console.error('✗ ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required.');
+    process.exit(1);
+  }
+  console.log(`[STEP 0] Authenticating as Admin (${adminEmail})...`);
   const loginRes = await request({
     hostname: 'localhost',
     port: 5000,
     path: '/login',
     method: 'POST',
     headers: { 'Content-Type': 'application/json' }
-  }, { email: 'vrajgoti07@gmail.com', password: '123456789' });
+  }, { email: adminEmail, password: adminPass });
 
   if (loginRes.status === 200 && loginRes.data.token) {
     authToken = loginRes.data.token;

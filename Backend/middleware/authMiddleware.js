@@ -19,7 +19,12 @@ const authMiddleware = (req, res, next) => {
     });
   }
 
-  const jwtSecret = process.env.JWT_SECRET || "default_secret_key";
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret) {
+    return res.status(500).json({
+      message: "Server configuration error: JWT_SECRET is not configured"
+    });
+  }
 
   try {
     const decoded = jwt.verify(token, jwtSecret);
