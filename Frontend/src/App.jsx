@@ -59,6 +59,27 @@ export default function App() {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  // Lock body scroll and listen for Escape key when mobile menu is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && mobileOpen) {
+        setMobileOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [mobileOpen]);
+
   // Central navigation handler
   const handleNavigate = useCallback((path) => {
     const cleanPath = path.toLowerCase();
@@ -205,17 +226,30 @@ export default function App() {
         onLogout={handleLogout}
       />
 
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div
+          className="mobile-backdrop"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Mobile menu drawer */}
       <div className={`mobile-menu ${mobileOpen ? 'open' : ''}`}>
-        {NAV_ITEMS.map((item) => (
-          <button
-            key={item.path}
-            className="mobile-nav-link"
-            onClick={() => handleNavigate(item.path)}
-          >
-            <span>{item.label}</span>
-          </button>
-        ))}
+        {NAV_ITEMS.map((item) => {
+          const isActive = currentPath === item.path || (item.path === '/' && (currentPath === '' || currentPath === '/home' || currentPath === '/index.html'));
+          return (
+            <button
+              key={item.path}
+              className={`mobile-nav-link ${isActive ? 'active' : ''}`}
+              onClick={() => handleNavigate(item.path)}
+            >
+              <span>{item.label}</span>
+              {isActive && <span className="mobile-active-indicator" aria-hidden="true">●</span>}
+            </button>
+          );
+        })}
 
         {isAdmin && (
           <button

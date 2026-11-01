@@ -149,7 +149,7 @@ export default function Navbar({
             </button>
           </div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div className="nav-auth-buttons" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <button
               id="nav-login-btn"
               onClick={() => onNavigate('/login')}

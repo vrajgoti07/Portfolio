@@ -296,17 +296,8 @@ export default function TaskManager({ user, onNavigate }) {
       </div>
 
       {/* Search and Filters Bar */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          marginBottom: '1.75rem'
-        }}
-      >
-        <div style={{ position: 'relative', minWidth: '240px' }}>
+      <div className="kanban-filter-bar">
+        <div className="kanban-search-box-wrap">
           <Search size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
           <input
             type="text"
@@ -318,7 +309,7 @@ export default function TaskManager({ user, onNavigate }) {
           />
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div className="kanban-filter-actions">
           <Filter size={14} color="var(--text-muted)" />
           <select
             value={priorityFilter}

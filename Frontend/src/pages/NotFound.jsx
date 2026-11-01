@@ -16,17 +16,7 @@ export default function NotFound({ onBackToHome, onNavigate }) {
     >
       <div className="container" style={{ maxWidth: '480px' }}>
         <Reveal>
-          <div
-            style={{
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '2.5rem',
-              boxShadow: 'var(--shadow-lg)',
-              textAlign: 'center',
-              position: 'relative'
-            }}
-          >
+          <div className="auth-card" style={{ textAlign: 'center' }}>
             {/* Top accent */}
             <div
               style={{

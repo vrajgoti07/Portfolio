@@ -78,16 +78,7 @@ export default function LoginPage({ onNavigate, onLoginSuccess }) {
         )}
 
         <Reveal>
-          <div
-            style={{
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '2.5rem',
-              boxShadow: 'var(--shadow-lg)',
-              position: 'relative'
-            }}
-          >
+          <div className="auth-card">
             {/* Top accent line */}
             <div
               style={{

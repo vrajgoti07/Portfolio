@@ -337,7 +337,7 @@ export default function AdminDashboard({ onNavigate }) {
                 {currentEmail}
               </span>
             </div>
-            <h1 style={{ fontSize: '2.4rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0.2rem 0' }}>
+            <h1 className="admin-dashboard-title" style={{ fontWeight: 800, color: 'var(--text-primary)', margin: '0.2rem 0' }}>
               Admin Executive Dashboard
             </h1>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', margin: 0 }}>
@@ -377,14 +377,7 @@ export default function AdminDashboard({ onNavigate }) {
         {!loading && !error && (
           <>
             {/* Executive Summary Metrics Grid */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                gap: '1rem',
-                marginBottom: '2.5rem'
-              }}
-            >
+            <div className="admin-summary-grid">
               <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.25rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
                   <span style={{ fontFamily: 'var(--font-code)', fontSize: '0.72rem', textTransform: 'uppercase' }}>Registered Team</span>
@@ -432,7 +425,7 @@ export default function AdminDashboard({ onNavigate }) {
             </div>
 
             {/* Admin Tabs */}
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', flexWrap: 'wrap', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+            <div className="admin-tabs-row" style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', flexWrap: 'wrap', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
               <button
                 className={`skill-tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
                 onClick={() => setActiveTab('overview')}
@@ -470,7 +463,7 @@ export default function AdminDashboard({ onNavigate }) {
                     Registered users, assigned tasks, and current execution distribution.
                   </p>
 
-                  <div style={{ overflowX: 'auto' }}>
+                  <div className="admin-table-wrapper" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
                       <thead>
                         <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontFamily: 'var(--font-code)', fontSize: '0.76rem', textTransform: 'uppercase' }}>
@@ -707,7 +700,7 @@ export default function AdminDashboard({ onNavigate }) {
                       <p style={{ fontSize: '0.85rem' }}>Try clearing your search query or status filter.</p>
                     </div>
                   ) : (
-                    <div style={{ overflowX: 'auto' }}>
+                    <div className="admin-table-wrapper" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
                         <thead>
                           <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontFamily: 'var(--font-code)', fontSize: '0.74rem', textTransform: 'uppercase' }}>
