@@ -249,7 +249,7 @@ export default function Contact() {
               )}
 
               <form onSubmit={handleSubmit} noValidate>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '1rem' }}>
                   <div className="form-group">
                     <label htmlFor="contact-name" className="form-label">
                       Your Name *
